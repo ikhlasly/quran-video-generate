@@ -176,7 +176,7 @@ function SelectContent({ className, children, ...props }: React.ComponentProps<"
       ref={ref}
       data-slot="select-content"
       className={cn(
-        "bg-popover text-popover-foreground absolute top-full left-0 z-50 mt-1 min-w-full overflow-hidden rounded-md border shadow-md",
+        "bg-popover text-popover-foreground absolute top-full left-0 z-50 mt-1 min-w-[220px] overflow-hidden rounded-md border shadow-md",
         className
       )}
       {...props}
