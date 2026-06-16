@@ -6,12 +6,13 @@ import {
   Moon, Sun, Settings, Play, Pause, SkipForward, SkipBack,
   Video, Trash2, Download, Loader2, CheckCircle2, XCircle,
   BookOpen, Volume2, Film, Sparkles, Eye,
-  AlertTriangle, ExternalLink, PlusCircle, FolderOpen, Code2, Globe,
+  AlertTriangle, ExternalLink, PlusCircle, FolderOpen, Globe,
   Info
 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { GitHubIcon } from '@/components/ui/github-icon';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -642,7 +643,7 @@ export default function HomePage() {
                 aria-label="GitHub"
               >
                 <a href="https://github.com" target="_blank" rel="noopener noreferrer">
-                  <Code2 className="h-5 w-5" />
+                  <GitHubIcon className="h-5 w-5" />
                 </a>
               </Button>
               <Select value={locale} onValueChange={(v) => { setLocale(v as Locale); localStorage.setItem('locale', v); }}>
