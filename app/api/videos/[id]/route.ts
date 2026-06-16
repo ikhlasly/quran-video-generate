@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
-import { getVideoMetadata, deleteVideoMetadata } from '@/lib/generation';
+import { deleteVideoMetadata } from '@/lib/generation';
 import { STORAGE_PATHS } from '@/lib/storage';
 
 export async function GET(
