@@ -42,7 +42,7 @@
 ### Installation
 
 ```bash
-git clone https://github.com/your-username/quran-video-generate.git
+git clone https://github.com/ikhlasly/quran-video-generate.git
 cd quran-video-generate
 bun install
 bun dev
@@ -214,7 +214,7 @@ quran-video-generate/
 ### Development Setup
 
 ```bash
-git clone https://github.com/your-username/quran-video-generate.git
+git clone https://github.com/ikhlasly/quran-video-generate.git
 cd quran-video-generate
 bun install
 bun dev
@@ -291,6 +291,6 @@ MIT — see [LICENSE](LICENSE).
 
 **Built with ❤️ for the Muslim community**
 
-[Report Bug](https://github.com/your-username/quran-video-generate/issues) · [Request Feature](https://github.com/your-username/quran-video-generate/issues)
+[Report Bug](https://github.com/ikhlasly/quran-video-generate/issues) · [Request Feature](https://github.com/ikhlasly/quran-video-generate/issues)
 
 </div>
