@@ -103,10 +103,10 @@ export const AI_PROVIDER_MODELS: Record<AIProvider, { label: string; models: str
   openrouter: {
     label: 'OpenRouter (Free)',
     models: [
-      'nvidia/nemotron-3-super-120b-a12b:free',
+      'nvidia/nemotron-3-ultra-550b-a55b:free',
       'google/gemma-4-31b-it:free',
       'meta-llama/llama-3.3-70b-instruct:free',
-      'qwen/qwen3-next-80b-a3b-instruct:free',
+      'qwen/qwen3-coder:free',
       'openai/gpt-oss-120b:free',
     ],
     requiresKey: true,
