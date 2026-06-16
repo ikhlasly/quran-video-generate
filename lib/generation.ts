@@ -471,13 +471,24 @@ async function runPipeline(
   updateJob(job);
 
   const clipPaths: string[] = [];
-  for (let i = 0; i < videoUrls.length; i++) {
-    const clipPath = path.join(jobDir, `clip_${i}.mp4`);
-    try {
-      await downloadFile(videoUrls[i], clipPath);
-      clipPaths.push(clipPath);
-    } catch (err) {
-      console.error(`Failed to download clip ${i}:`, err);
+  // Download clips in parallel with concurrency limit
+  const CONCURRENCY = 3;
+  for (let batch = 0; batch < videoUrls.length; batch += CONCURRENCY) {
+    const batchUrls = videoUrls.slice(batch, batch + CONCURRENCY);
+    const results = await Promise.allSettled(
+      batchUrls.map(async (url, batchIdx) => {
+        const clipIdx = batch + batchIdx;
+        const clipPath = path.join(jobDir, `clip_${clipIdx}.mp4`);
+        await downloadFile(url, clipPath);
+        return { clipPath, clipIdx };
+      })
+    );
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        clipPaths.push(result.value.clipPath);
+      } else {
+        console.error(`Failed to download clip:`, result.reason);
+      }
     }
   }
 

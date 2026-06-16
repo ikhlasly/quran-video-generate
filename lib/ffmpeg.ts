@@ -59,258 +59,6 @@ export function scaleVideo(
   });
 }
 
-export function concatenateClips(
-  clipPaths: string[],
-  output: string,
-  orientation: Orientation
-): Promise<void> {
-  const preset = ORIENTATION_PRESETS[orientation];
-
-  return new Promise(async (resolve, reject) => {
-    if (clipPaths.length === 0) {
-      return reject(new Error('No clips to concatenate'));
-    }
-
-    if (clipPaths.length === 1) {
-      // Still need to re-encode to ensure consistent format
-      ffmpeg(clipPaths[0])
-        .outputOptions([
-          '-vf', `scale=${preset.width}:${preset.height}:force_original_aspect_ratio=decrease,pad=${preset.width}:${preset.height}:(ow-iw)/2:(oh-ih)/2:black`,
-          '-c:v', 'libx264',
-          '-preset', 'fast',
-          '-crf', '23',
-          '-r', '30',
-          '-an',
-          '-pix_fmt', 'yuv420p',
-        ])
-        .output(output)
-        .on('end', () => resolve())
-        .on('error', (err) => reject(err))
-        .run();
-      return;
-    }
-
-    // Create concat file list
-    const concatListPath = output + '.concat.txt';
-    const lines = clipPaths.map(p => `file '${p.replace(/'/g, "'\\''")}'`);
-    fs.writeFileSync(concatListPath, lines.join('\n'));
-
-    ffmpeg()
-      .input(concatListPath)
-      .inputOptions(['-f', 'concat', '-safe', '0'])
-      .outputOptions([
-        '-vf', `scale=${preset.width}:${preset.height}:force_original_aspect_ratio=decrease,pad=${preset.width}:${preset.height}:(ow-iw)/2:(oh-ih)/2:black,fps=30`,
-        '-c:v', 'libx264',
-        '-preset', 'fast',
-        '-crf', '23',
-        '-r', '30',
-        '-an',
-        '-pix_fmt', 'yuv420p',
-      ])
-      .output(output)
-      .on('end', () => {
-        try { fs.unlinkSync(concatListPath); } catch { /* ignore */ }
-        resolve();
-      })
-      .on('error', (err) => {
-        try { fs.unlinkSync(concatListPath); } catch { /* ignore */ }
-        reject(err);
-      })
-      .run();
-  });
-}
-
-export function addAudioToVideo(
-  video: string,
-  audio: string,
-  output: string,
-  audioDuration?: number
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const cmd = ffmpeg()
-      .input(video)
-      .input(audio);
-
-    const outputOpts = [
-      '-c:v', 'copy',
-      '-c:a', 'aac',
-      '-b:a', '192k',
-      '-map', '0:v:0',
-      '-map', '1:a:0',
-    ];
-
-    if (audioDuration && audioDuration > 0) {
-      outputOpts.push('-t', String(Math.ceil(audioDuration)));
-    }
-
-    outputOpts.push('-shortest');
-
-    cmd.outputOptions(outputOpts)
-      .output(output)
-      .on('end', () => resolve())
-      .on('error', (err) => reject(err))
-      .run();
-  });
-}
-
-export function burnSubtitles(
-  video: string,
-  sub: string,
-  output: string
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    ffmpeg(video)
-      .outputOptions([
-        '-vf', `subtitles='${sub.replace(/'/g, "\\'").replace(/:/g, "\\:")}'`,
-        '-c:v', 'libx264',
-        '-preset', 'fast',
-        '-crf', '23',
-        '-c:a', 'copy',
-      ])
-      .output(output)
-      .on('end', () => resolve())
-      .on('error', (err) => reject(err))
-      .run();
-  });
-}
-
-export function addAudioAndBurnSubtitles(
-  video: string,
-  audio: string,
-  arabicSub: string,
-  translationSub: string,
-  output: string,
-  orientation: Orientation,
-  audioDuration?: number,
-  showArabic: boolean = true,
-  showTranslation: boolean = true,
-  logoSub?: string
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const subtitleFilters: string[] = [];
-
-    // Subtitle filter (combined ASS with Arabic + Translation in unified block)
-    // When both arabic and translation are shown, they share the same ASS file
-    if (showArabic && fs.existsSync(arabicSub)) {
-      subtitleFilters.push(
-        `subtitles='${arabicSub.replace(/'/g, "\\'").replace(/:/g, "\\:")}'`
-      );
-    }
-
-    // Only apply a second subtitle filter if translation uses a separate file
-    if (showTranslation && fs.existsSync(translationSub) && translationSub !== arabicSub) {
-      subtitleFilters.push(
-        `subtitles='${translationSub.replace(/'/g, "\\'").replace(/:/g, "\\:")}'`
-      );
-    }
-
-    // Logo overlay (persistent text watermark) — applied last so it sits on top
-    if (logoSub && fs.existsSync(logoSub)) {
-      subtitleFilters.push(
-        `subtitles='${logoSub.replace(/'/g, "\\'").replace(/:/g, "\\:")}'`
-      );
-    }
-
-    if (subtitleFilters.length === 0) {
-      // No subtitles, just add audio
-      addAudioToVideo(video, audio, output, audioDuration).then(resolve).catch(reject);
-      return;
-    }
-
-    const vfChain = subtitleFilters.join(',');
-
-    // Video is already pre-looped to sufficient duration, no -stream_loop needed
-    const cmd = ffmpeg()
-      .input(video)
-      .input(audio);
-
-    const outputOpts = [
-      '-vf', vfChain,
-      '-c:v', 'libx264',
-      '-preset', 'fast',
-      '-crf', '23',
-      '-c:a', 'aac',
-      '-b:a', '192k',
-      '-map', '0:v:0',
-      '-map', '1:a:0',
-      '-pix_fmt', 'yuv420p',
-    ];
-
-    if (audioDuration && audioDuration > 0) {
-      outputOpts.push('-t', String(Math.ceil(audioDuration)));
-    }
-
-    outputOpts.push('-shortest');
-
-    cmd.outputOptions(outputOpts)
-      .output(output)
-      .on('end', () => resolve())
-      .on('error', (err) => reject(err))
-      .run();
-  });
-}
-
-
-
-export function burnDualSubtitles(
-  video: string,
-  arabicSub: string,
-  translationSub: string,
-  output: string,
-  orientation: Orientation,
-  showArabic: boolean = true,
-  showTranslation: boolean = true,
-  logoSub?: string
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const subtitleFilters: string[] = [];
-
-    // Combined ASS with Arabic + Translation in unified block
-    if (showArabic && fs.existsSync(arabicSub)) {
-      subtitleFilters.push(
-        `subtitles='${arabicSub.replace(/'/g, "\\'").replace(/:/g, "\\:")}'`
-      );
-    }
-
-    // Only apply a second subtitle filter if translation uses a separate file
-    if (showTranslation && fs.existsSync(translationSub) && translationSub !== arabicSub) {
-      subtitleFilters.push(
-        `subtitles='${translationSub.replace(/'/g, "\\'").replace(/:/g, "\\:")}'`
-      );
-    }
-
-    // Logo overlay (persistent text watermark) — applied last so it sits on top
-    if (logoSub && fs.existsSync(logoSub)) {
-      subtitleFilters.push(
-        `subtitles='${logoSub.replace(/'/g, "\\'").replace(/:/g, "\\:")}'`
-      );
-    }
-
-    if (subtitleFilters.length === 0) {
-      // Just copy
-      fs.copyFileSync(video, output);
-      resolve();
-      return;
-    }
-
-    const vfChain = subtitleFilters.join(',');
-
-    ffmpeg(video)
-      .outputOptions([
-        '-vf', vfChain,
-        '-c:v', 'libx264',
-        '-preset', 'fast',
-        '-crf', '23',
-        '-c:a', 'copy',
-        '-pix_fmt', 'yuv420p',
-      ])
-      .output(output)
-      .on('end', () => resolve())
-      .on('error', (err) => reject(err))
-      .run();
-  });
-}
-
 // Generate a simple gradient background video using FFmpeg (direct spawn)
 export function generateBackgroundVideo(
   output: string,
@@ -357,87 +105,82 @@ export async function renderVideo(
   showTranslation: boolean = true,
   logoSub?: string
 ): Promise<void> {
-  // Step 1: Concatenate clips
-  const concatOutput = path.join(jobDir, 'concatenated.mp4');
-  await concatenateClips(clipPaths, concatOutput, orientation);
+  const preset = ORIENTATION_PRESETS[orientation];
 
-  // Step 2: If the concatenated video is shorter than the audio, loop it
-  // This is more reliable than -stream_loop which doesn't work well with fluent-ffmpeg
-  let videoInput = concatOutput;
+  // Build subtitle filter chain
+  const subtitleFilters: string[] = [];
+  if (showArabic && fs.existsSync(arabicSub)) {
+    subtitleFilters.push(
+      `subtitles='${arabicSub.replace(/'/g, "\\'").replace(/:/g, "\\:")}'`
+    );
+  }
+  if (showTranslation && fs.existsSync(translationSub) && translationSub !== arabicSub) {
+    subtitleFilters.push(
+      `subtitles='${translationSub.replace(/'/g, "\\'").replace(/:/g, "\\:")}'`
+    );
+  }
+  if (logoSub && fs.existsSync(logoSub)) {
+    subtitleFilters.push(
+      `subtitles='${logoSub.replace(/'/g, "\\'").replace(/:/g, "\\:")}'`
+    );
+  }
+
+  // Calculate how many times to loop clips to cover audio duration
   const targetDuration = audioDuration && audioDuration > 0 ? audioDuration : 0;
-
+  let totalClipDuration = 0;
   if (targetDuration > 0) {
-    try {
-      const concatDuration = await getVideoDuration(concatOutput);
-      if (concatDuration < targetDuration) {
-        const loopedOutput = path.join(jobDir, 'looped.mp4');
-        await loopVideoToDuration(concatOutput, loopedOutput, targetDuration, jobDir);
-        videoInput = loopedOutput;
-        // Clean up un-looped concat
-        try { fs.unlinkSync(concatOutput); } catch { /* ignore */ }
+    for (const clip of clipPaths) {
+      try {
+        totalClipDuration += await getVideoDuration(clip);
+      } catch {
+        totalClipDuration += 15; // assume 15s per clip if probe fails
       }
-    } catch (err) {
-      console.error('Failed to check video duration for looping:', err);
-      // Continue with un-looped video - -shortest will still work
     }
   }
 
-  // Step 3: Add audio and burn subtitles (and optional logo) in single pass
-  await addAudioAndBurnSubtitles(
-    videoInput,
-    audio,
-    arabicSub,
-    translationSub,
-    output,
-    orientation,
-    audioDuration,
-    showArabic,
-    showTranslation,
-    logoSub
-  );
+  const loopMultiplier = totalClipDuration > 0 && targetDuration > totalClipDuration
+    ? Math.ceil(targetDuration / totalClipDuration) + 1
+    : 1;
 
-  // Clean up temp file
-  try { fs.unlinkSync(videoInput); } catch { /* ignore */ }
-}
-
-/**
- * Loop a video file to reach a target duration using the concat demuxer.
- * This creates a new video by repeating the input file enough times
- * to cover the target duration, which is more reliable than -stream_loop.
- */
-async function loopVideoToDuration(
-  inputPath: string,
-  outputPath: string,
-  targetDuration: number,
-  jobDir: string
-): Promise<void> {
-  const videoDuration = await getVideoDuration(inputPath);
-  if (videoDuration <= 0) {
-    // Can't determine duration, just copy
-    fs.copyFileSync(inputPath, outputPath);
-    return;
-  }
-
-  // Calculate how many loops are needed (add 1 extra for safety margin)
-  const loopCount = Math.ceil(targetDuration / videoDuration) + 1;
-
-  // Create concat file that repeats the input video
-  const concatListPath = path.join(jobDir, 'loop_concat.txt');
-  const escapedPath = inputPath.replace(/'/g, "'\\''");
+  // Create concat list (with loops if needed)
+  const concatListPath = path.join(jobDir, 'concat.txt');
   const lines: string[] = [];
-  for (let i = 0; i < loopCount; i++) {
-    lines.push(`file '${escapedPath}'`);
+  for (let loop = 0; loop < loopMultiplier; loop++) {
+    for (const clip of clipPaths) {
+      lines.push(`file '${clip.replace(/'/g, "'\\''")}'`);
+    }
   }
   fs.writeFileSync(concatListPath, lines.join('\n'));
+
+  // Build combined filter: scale → pad → subtitles
+  const scaleFilter = `scale=${preset.width}:${preset.height}:force_original_aspect_ratio=decrease,pad=${preset.width}:${preset.height}:(ow-iw)/2:(oh-ih)/2:black,fps=24`;
+  const allFilters = [scaleFilter, ...subtitleFilters];
+  const vfChain = allFilters.join(',');
+
+  const outputOpts = [
+    '-vf', vfChain,
+    '-c:v', 'libx264',
+    '-preset', 'veryfast',
+    '-crf', '23',
+    '-c:a', 'aac',
+    '-b:a', '192k',
+    '-map', '0:v:0',
+    '-map', '1:a:0',
+    '-pix_fmt', 'yuv420p',
+  ];
+
+  if (targetDuration > 0) {
+    outputOpts.push('-t', String(Math.ceil(targetDuration)));
+  }
+  outputOpts.push('-shortest');
 
   return new Promise((resolve, reject) => {
     ffmpeg()
       .input(concatListPath)
       .inputOptions(['-f', 'concat', '-safe', '0'])
-      .outputOptions([
-        '-c', 'copy',
-      ])
-      .output(outputPath)
+      .input(audio)
+      .outputOptions(outputOpts)
+      .output(output)
       .on('end', () => {
         try { fs.unlinkSync(concatListPath); } catch { /* ignore */ }
         resolve();
@@ -466,40 +209,87 @@ export async function renderVideoWithoutAudio(
   showTranslation: boolean = true,
   logoSub?: string
 ): Promise<void> {
-  // Step 1: Concatenate clips
-  const concatOutput = path.join(jobDir, 'concatenated_noaudio.mp4');
-  await concatenateClips(clipPaths, concatOutput, orientation);
+  const preset = ORIENTATION_PRESETS[orientation];
 
-  // Step 2: If the concatenated video is shorter than target, loop it
-  let videoInput = concatOutput;
-  if (targetDuration && targetDuration > 0) {
-    try {
-      const concatDuration = await getVideoDuration(concatOutput);
-      if (concatDuration < targetDuration) {
-        const loopedOutput = path.join(jobDir, 'looped_noaudio.mp4');
-        await loopVideoToDuration(concatOutput, loopedOutput, targetDuration, jobDir);
-        videoInput = loopedOutput;
-        try { fs.unlinkSync(concatOutput); } catch { /* ignore */ }
+  // Build subtitle filter chain
+  const subtitleFilters: string[] = [];
+  if (showArabic && fs.existsSync(arabicSub)) {
+    subtitleFilters.push(
+      `subtitles='${arabicSub.replace(/'/g, "\\'").replace(/:/g, "\\:")}'`
+    );
+  }
+  if (showTranslation && fs.existsSync(translationSub) && translationSub !== arabicSub) {
+    subtitleFilters.push(
+      `subtitles='${translationSub.replace(/'/g, "\\'").replace(/:/g, "\\:")}'`
+    );
+  }
+  if (logoSub && fs.existsSync(logoSub)) {
+    subtitleFilters.push(
+      `subtitles='${logoSub.replace(/'/g, "\\'").replace(/:/g, "\\:")}'`
+    );
+  }
+
+  // Calculate loop multiplier
+  const duration = targetDuration && targetDuration > 0 ? targetDuration : 0;
+  let totalClipDuration = 0;
+  if (duration > 0) {
+    for (const clip of clipPaths) {
+      try {
+        totalClipDuration += await getVideoDuration(clip);
+      } catch {
+        totalClipDuration += 15;
       }
-    } catch (err) {
-      console.error('Failed to check video duration for looping:', err);
     }
   }
 
-  // Step 3: Burn subtitles (and optional logo)
-  await burnDualSubtitles(
-    videoInput,
-    arabicSub,
-    translationSub,
-    output,
-    orientation,
-    showArabic,
-    showTranslation,
-    logoSub
-  );
+  const loopMultiplier = totalClipDuration > 0 && duration > totalClipDuration
+    ? Math.ceil(duration / totalClipDuration) + 1
+    : 1;
 
-  // Clean up temp file
-  try { fs.unlinkSync(videoInput); } catch { /* ignore */ }
+  // Create concat list
+  const concatListPath = path.join(jobDir, 'concat_noaudio.txt');
+  const lines: string[] = [];
+  for (let loop = 0; loop < loopMultiplier; loop++) {
+    for (const clip of clipPaths) {
+      lines.push(`file '${clip.replace(/'/g, "'\\''")}'`);
+    }
+  }
+  fs.writeFileSync(concatListPath, lines.join('\n'));
+
+  // Build combined filter
+  const scaleFilter = `scale=${preset.width}:${preset.height}:force_original_aspect_ratio=decrease,pad=${preset.width}:${preset.height}:(ow-iw)/2:(oh-ih)/2:black,fps=24`;
+  const allFilters = [scaleFilter, ...subtitleFilters];
+  const vfChain = allFilters.join(',');
+
+  const outputOpts = [
+    '-vf', vfChain,
+    '-c:v', 'libx264',
+    '-preset', 'veryfast',
+    '-crf', '23',
+    '-an',
+    '-pix_fmt', 'yuv420p',
+  ];
+
+  if (duration > 0) {
+    outputOpts.push('-t', String(Math.ceil(duration)));
+  }
+
+  return new Promise((resolve, reject) => {
+    ffmpeg()
+      .input(concatListPath)
+      .inputOptions(['-f', 'concat', '-safe', '0'])
+      .outputOptions(outputOpts)
+      .output(output)
+      .on('end', () => {
+        try { fs.unlinkSync(concatListPath); } catch { /* ignore */ }
+        resolve();
+      })
+      .on('error', (err) => {
+        try { fs.unlinkSync(concatListPath); } catch { /* ignore */ }
+        reject(err);
+      })
+      .run();
+  });
 }
 
 export function downloadFile(url: string, output: string): Promise<void> {
