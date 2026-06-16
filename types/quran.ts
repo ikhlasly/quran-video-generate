@@ -81,7 +81,7 @@ export interface VideoSourceConfig {
 export const AI_PROVIDER_MODELS: Record<AIProvider, { label: string; models: string[]; requiresKey: boolean; keyLabel: string; keyUrl: string }> = {
   openai: {
     label: 'OpenAI',
-    models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+    models: ['gpt-4o', 'gpt-4o-mini', 'o3-mini', 'gpt-4.1-nano'],
     requiresKey: true,
     keyLabel: 'OpenAI API Key',
     keyUrl: 'https://platform.openai.com/api-keys',
@@ -104,10 +104,10 @@ export const AI_PROVIDER_MODELS: Record<AIProvider, { label: string; models: str
     label: 'OpenRouter (Free)',
     models: [
       'deepseek/deepseek-chat:free',
-      'google/gemma-2-9b-it:free',
+      'google/gemini-2.0-flash-exp:free',
       'meta-llama/llama-3.1-8b-instruct:free',
       'mistralai/mistral-7b-instruct:free',
-      'qwen/qwen-2-7b-instruct:free',
+      'qwen/qwen2.5-7b-instruct:free',
     ],
     requiresKey: true,
     keyLabel: 'OpenRouter API Key',
@@ -115,14 +115,14 @@ export const AI_PROVIDER_MODELS: Record<AIProvider, { label: string; models: str
   },
   gemini: {
     label: 'Gemini',
-    models: ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-pro'],
+    models: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-pro'],
     requiresKey: true,
     keyLabel: 'Gemini API Key',
     keyUrl: 'https://aistudio.google.com/apikey',
   },
   ollama: {
     label: 'Local Ollama',
-    models: ['llama3.1', 'llama3', 'mistral', 'qwen2', 'gemma2', 'phi3'],
+    models: ['llama3.2', 'llama3.1', 'mistral', 'qwen2.5', 'gemma2', 'phi4'],
     requiresKey: false,
     keyLabel: '',
     keyUrl: '',
