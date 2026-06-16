@@ -50,7 +50,7 @@ function DialogTrigger({ children, asChild, ...props }: TriggerProps) {
   const { onOpenChange } = useDialog()
 
   if (asChild && React.isValidElement(children)) {
-    const child = children as React.ReactElement<{ onClick?: React.MouseEventHandler; className?: string }>
+    const child = children as React.ReactElement<{ onClick?: React.MouseEventHandler }>
     return React.cloneElement(child, {
       onClick: (e: React.MouseEvent) => {
         child.props.onClick?.(e)
@@ -94,57 +94,59 @@ function DialogContent({
   children,
   showCloseButton = true,
   ...props
-}: React.ComponentPropsWithoutRef<"dialog"> & { showCloseButton?: boolean }) {
+}: React.ComponentPropsWithoutRef<"div"> & { showCloseButton?: boolean }) {
   const { open, onOpenChange } = useDialog()
-  const dialogRef = React.useRef<HTMLDialogElement>(null)
 
   React.useEffect(() => {
-    const dialog = dialogRef.current
-    if (!dialog) return
-
-    if (open && !dialog.open) {
-      dialog.showModal()
-    } else if (!open && dialog.open) {
-      dialog.close()
+    if (open) {
+      document.body.style.overflow = "hidden"
+    } else {
+      document.body.style.overflow = ""
+    }
+    return () => {
+      document.body.style.overflow = ""
     }
   }, [open])
 
   React.useEffect(() => {
-    const dialog = dialogRef.current
-    if (!dialog) return
+    if (!open) return
 
-    const handleClose = () => onOpenChange(false)
-    dialog.addEventListener("close", handleClose)
-    return () => dialog.removeEventListener("close", handleClose)
-  }, [onOpenChange])
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onOpenChange(false)
+    }
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [open, onOpenChange])
+
+  if (!open) return null
 
   return (
-    <dialog
-      ref={dialogRef}
-      data-slot="dialog-content"
-      className={cn(
-        "bg-background fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg sm:max-w-lg backdrop:bg-black/50",
-        "open:animate-in open:fade-in-0 open:zoom-in-95",
-        className
-      )}
-      onClick={(e) => {
-        if (e.target === dialogRef.current) onOpenChange(false)
-      }}
-      {...(props as React.DialogHTMLAttributes<HTMLDialogElement>)}
-    >
-      {children}
-      {showCloseButton && (
-        <button
-          type="button"
-          data-slot="dialog-close"
-          onClick={() => onOpenChange(false)}
-          className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-        >
-          <XIcon />
-          <span className="sr-only">Close</span>
-        </button>
-      )}
-    </dialog>
+    <div data-slot="dialog-overlay" className="fixed inset-0 z-50 bg-black/50" onClick={() => onOpenChange(false)}>
+      <div
+        data-slot="dialog-content"
+        role="dialog"
+        aria-modal="true"
+        className={cn(
+          "bg-background fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg sm:max-w-lg",
+          className
+        )}
+        onClick={(e) => e.stopPropagation()}
+        {...props}
+      >
+        {children}
+        {showCloseButton && (
+          <button
+            type="button"
+            data-slot="dialog-close"
+            onClick={() => onOpenChange(false)}
+            className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+          >
+            <XIcon />
+            <span className="sr-only">Close</span>
+          </button>
+        )}
+      </div>
+    </div>
   )
 }
 

@@ -9,8 +9,8 @@ interface SelectContextValue {
   onValueChange: (value: string) => void
   open: boolean
   setOpen: (open: boolean) => void
-  selectedContent: React.ReactNode
-  setSelectedContent: (content: React.ReactNode) => void
+  registerItem: (value: string, content: React.ReactNode) => void
+  itemContents: Map<string, React.ReactNode>
 }
 
 const SelectContext = React.createContext<SelectContextValue | null>(null)
@@ -32,7 +32,7 @@ interface SelectProps {
 function Select({ children, value: controlledValue, defaultValue, onValueChange, disabled }: SelectProps) {
   const [internalValue, setInternalValue] = React.useState(defaultValue || "")
   const [open, setOpen] = React.useState(false)
-  const [selectedContent, setSelectedContent] = React.useState<React.ReactNode>(null)
+  const [itemContents, setItemContents] = React.useState(new Map<string, React.ReactNode>())
   const isControlled = controlledValue !== undefined
   const value = isControlled ? controlledValue : internalValue
 
@@ -54,9 +54,27 @@ function Select({ children, value: controlledValue, defaultValue, onValueChange,
     [disabled]
   )
 
+  const registerItem = React.useCallback(
+    (itemValue: string, content: React.ReactNode) => {
+      setItemContents(prev => {
+        const next = new Map(prev)
+        next.set(itemValue, content)
+        return next
+      })
+    },
+    []
+  )
+
   const contextValue = React.useMemo(
-    () => ({ value, onValueChange: handleValueChange, open, setOpen: handleSetOpen, selectedContent, setSelectedContent }),
-    [value, handleValueChange, open, handleSetOpen, selectedContent]
+    () => ({
+      value,
+      onValueChange: handleValueChange,
+      open,
+      setOpen: handleSetOpen,
+      registerItem,
+      itemContents,
+    }),
+    [value, handleValueChange, open, handleSetOpen, registerItem, itemContents]
   )
 
   return (
@@ -91,8 +109,9 @@ function SelectTrigger({ className, children, ...props }: React.ComponentProps<"
 }
 
 function SelectValue({ placeholder, children }: { placeholder?: string; children?: React.ReactNode }) {
-  const { value, selectedContent } = useSelect()
-  if (value && selectedContent) return <span data-slot="select-value">{selectedContent}</span>
+  const { value, itemContents } = useSelect()
+  const registeredContent = itemContents.get(value)
+  if (value && registeredContent) return <span data-slot="select-value">{registeredContent}</span>
   if (value && children) return <span data-slot="select-value">{children}</span>
   if (value) return <span data-slot="select-value">{value}</span>
   return <span data-slot="select-value" className="text-muted-foreground">{placeholder}</span>
@@ -164,13 +183,12 @@ interface SelectItemProps extends React.ComponentProps<"button"> {
 }
 
 function SelectItem({ className, children, value, ...props }: SelectItemProps) {
-  const { value: selectedValue, onValueChange, setSelectedContent } = useSelect()
+  const { value: selectedValue, onValueChange, registerItem, setOpen } = useSelect()
   const isSelected = selectedValue === value
 
-  const handleClick = () => {
-    setSelectedContent(children)
-    onValueChange(value)
-  }
+  React.useEffect(() => {
+    registerItem(value, children)
+  }, [value, children, registerItem])
 
   return (
     <button
@@ -178,7 +196,10 @@ function SelectItem({ className, children, value, ...props }: SelectItemProps) {
       data-slot="select-item"
       role="option"
       aria-selected={isSelected}
-      onClick={handleClick}
+      onClick={() => {
+        onValueChange(value)
+        setOpen(false)
+      }}
       className={cn(
         "focus:bg-accent focus:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 hover:bg-accent hover:text-accent-foreground",
         className
