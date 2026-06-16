@@ -88,14 +88,14 @@ export const AI_PROVIDER_MODELS: Record<AIProvider, { label: string; models: str
   },
   deepseek: {
     label: 'DeepSeek',
-    models: ['deepseek-chat', 'deepseek-reasoner'],
+    models: ['deepseek-chat', 'deepseek-reasoner', 'deepseek-v4-flash', 'deepseek-v4-pro'],
     requiresKey: true,
     keyLabel: 'DeepSeek API Key',
     keyUrl: 'https://platform.deepseek.com/api_keys',
   },
   glm: {
     label: 'GLM',
-    models: ['glm-4-flash', 'glm-4-air', 'glm-4-plus', 'glm-4-long'],
+    models: ['glm-4.7-flash', 'glm-4.7', 'glm-5.1', 'glm-5'],
     requiresKey: true,
     keyLabel: 'GLM API Key',
     keyUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
@@ -103,11 +103,11 @@ export const AI_PROVIDER_MODELS: Record<AIProvider, { label: string; models: str
   openrouter: {
     label: 'OpenRouter (Free)',
     models: [
-      'deepseek/deepseek-chat:free',
-      'google/gemini-2.0-flash-exp:free',
-      'meta-llama/llama-3.1-8b-instruct:free',
-      'mistralai/mistral-7b-instruct:free',
-      'qwen/qwen2.5-7b-instruct:free',
+      'nvidia/nemotron-3-super-120b-a12b:free',
+      'google/gemma-4-31b-it:free',
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'qwen/qwen3-next-80b-a3b-instruct:free',
+      'openai/gpt-oss-120b:free',
     ],
     requiresKey: true,
     keyLabel: 'OpenRouter API Key',
@@ -115,7 +115,7 @@ export const AI_PROVIDER_MODELS: Record<AIProvider, { label: string; models: str
   },
   gemini: {
     label: 'Gemini',
-    models: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-pro'],
+    models: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro', 'gemini-2.0-flash'],
     requiresKey: true,
     keyLabel: 'Gemini API Key',
     keyUrl: 'https://aistudio.google.com/apikey',

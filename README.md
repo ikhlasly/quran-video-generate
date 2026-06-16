@@ -174,14 +174,14 @@ quran-video-generate/
 
 ## 🤖 AI Providers
 
-| Provider | Requires Key | Base URL | Notes |
+| Provider | Requires Key | Model IDs | Notes |
 |---|---|---|---|
-| Gemini | Yes | `generativelanguage.googleapis.com` | Recommended default |
-| OpenAI | Yes | `api.openai.com/v1` | GPT-4o, GPT-4o-mini |
-| DeepSeek | Yes | `api.deepseek.com/v1` | deepseek-chat |
-| GLM | Yes | `open.bigmodel.cn/api/paas/v4` | glm-4-flash |
-| OpenRouter | Yes | `openrouter.ai/api/v1` | Free models available |
-| Ollama | No | `localhost:11434/v1` | Local, self-hosted |
+| Gemini | Yes | `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-2.0-flash` | Recommended default |
+| OpenAI | Yes | `gpt-4o`, `gpt-4o-mini`, `o3-mini`, `gpt-4.1-nano` | — |
+| DeepSeek | Yes | `deepseek-chat`, `deepseek-reasoner`, `deepseek-v4-flash` | Latest V4 available |
+| GLM | Yes | `glm-4.7-flash`, `glm-5.1`, `glm-5` | — |
+| OpenRouter | Yes | Free models: Nemotron, Gemma 4, Llama 3.3, Qwen3 | Many models available |
+| Ollama | No | `llama3.2`, `mistral`, `qwen2.5`, `gemma2`, `phi4` | Local, self-hosted |
 
 ---
 
