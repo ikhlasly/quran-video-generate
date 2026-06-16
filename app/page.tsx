@@ -1657,7 +1657,14 @@ export default function HomePage() {
                 {t.footerText}
               </p>
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs">{t.aiPowered}</Badge>
+              <a
+                href="https://ikhlasly.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+              >
+                Powered by ikhlasly.com
+              </a>
             </div>
           </div>
         </div>
