@@ -126,7 +126,7 @@ export default function HomePage() {
 
   // New provider-based settings
   const [aiProvider, setAiProvider] = useState<AIProvider>(() => (getLocalStorageValue('aiProvider', 'gemini') as AIProvider) || 'gemini');
-  const [aiModel, setAiModel] = useState<string>(() => getLocalStorageValue('aiModel', 'gemini-2.0-flash') || 'gemini-2.0-flash');
+  const [aiModel, setAiModel] = useState<string>(() => getLocalStorageValue('aiModel', 'gemini-2.5-flash') || 'gemini-2.5-flash');
   const [aiApiKey, setAiApiKey] = useState<string>(() => getLocalStorageValue('aiApiKey', ''));
   const [videoSource, setVideoSource] = useState<VideoSource>(() => (getLocalStorageValue('videoSource', 'pexels') as VideoSource) || 'pexels');
   const [videoApiKey, setVideoApiKey] = useState<string>(() => getLocalStorageValue('videoApiKey', ''));

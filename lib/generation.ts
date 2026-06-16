@@ -413,7 +413,7 @@ async function runPipeline(
   let concepts: VisualConcept[];
   // Determine AI provider and API key
   const aiProvider = config.aiProvider || 'gemini';
-  const aiModel = config.aiModel || 'gemini-2.0-flash';
+  const aiModel = config.aiModel || 'gemini-2.5-flash';
   const aiApiKey = config.aiApiKey || config.geminiApiKey || '';
 
   if (aiApiKey || aiProvider === 'ollama') {
