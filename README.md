@@ -1,36 +1,133 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Quran Video Generator
+
+AI-powered Quran video generation with recitation audio and dual subtitles. Select verses, choose a reciter and translation, and generate beautiful videos with synchronized Arabic text, translations, and background footage.
+
+## Features
+
+- **Verse Selection** — Browse all 114 surahs, choose ayah ranges
+- **Audio Recitation** — 100+ reciters from alquran.cloud
+- **Translations** — Supports 50+ languages
+- **AI Concept Extraction** — Uses AI (OpenAI, DeepSeek, Gemini, Ollama, OpenRouter, GLM) to extract visual themes from verses
+- **Stock Footage** — Searches Pexels or Pixabay for matching background clips
+- **Dual Subtitles** — Arabic + translation subtitles, configurable position
+- **Multiple Orientations** — Landscape (16:9), Portrait (9:16), Square (1:1)
+- **Text Logo Overlay** — Add custom channel branding with configurable position
+- **Dark Mode** — System-aware theme toggle
+- **26 UI Languages** — English, Arabic, French, German, Turkish, Urdu, Indonesian, and more
+
+## Tech Stack
+
+- **Framework**: [Next.js](https://nextjs.org) 16 (App Router)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com) v4
+- **Icons**: [Lucide](https://lucide.dev)
+- **Toasts**: [Sonner](https://sonner.emilkowal.ski)
+- **Video**: [FFmpeg](https://ffmpeg.org) (via fluent-ffmpeg)
+- **UI Components**: Lightweight custom components (no Radix UI dependency)
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- [Bun](https://bun.sh) (or Node.js 20+)
+- [FFmpeg](https://ffmpeg.org/download.html) installed on your system
+
+### Installation
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
+git clone https://github.com/your-username/quran-video-generate.git
+cd quran-video-generate
+bun install
+```
+
+### Development
+
+```bash
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Build
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+bun run build
+bun start
+```
 
-## Learn More
+## Configuration
 
-To learn more about Next.js, take a look at the following resources:
+All settings are stored in your browser's localStorage — no server-side configuration required.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### AI Provider
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Configure in the Settings modal:
 
-## Deploy on Vercel
+| Provider | Requires API Key | Notes |
+|---|---|---|
+| Gemini | Yes | [Get key](https://aistudio.google.com/apikey) |
+| OpenAI | Yes | [Get key](https://platform.openai.com/api-keys) |
+| DeepSeek | Yes | [Get key](https://platform.deepseek.com/api_keys) |
+| GLM | Yes | [Get key](https://open.bigmodel.cn/usercenter/apikeys) |
+| OpenRouter | Yes | [Get key](https://openrouter.ai/keys) — free models available |
+| Ollama | No | Local — runs on `http://localhost:11434` |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Video Source
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Source | Requires API Key | Notes |
+|---|---|---|
+| Pexels | Yes | [Get key](https://www.pexels.com/api/) |
+| Pixabay | Yes | [Get key](https://pixabay.com/api/docs/) |
+
+## Project Structure
+
+```
+├── app/                    # Next.js App Router
+│   ├── api/
+│   │   ├── generate/       # Video generation endpoint
+│   │   ├── quran/          # Quran data (surahs, ayahs)
+│   │   └── videos/         # Video CRUD + streaming
+│   ├── globals.css         # Tailwind + shadcn CSS variables
+│   ├── layout.tsx          # Root layout
+│   └── page.tsx            # Main page
+├── components/ui/          # UI primitives (no Radix)
+├── lib/                    # Core logic
+│   ├── generation.ts       # Video generation pipeline
+│   ├── ffmpeg.ts           # FFmpeg operations
+│   ├── quran-api.ts        # alquran.cloud API client
+│   ├── i18n.ts             # Translations (26 languages)
+│   ├── storage.ts          # File system storage
+│   └── utils.ts            # cn() utility
+├── types/                  # TypeScript types
+├── public/                 # Static assets
+└── storage/                # Generated videos (gitignored)
+```
+
+## How It Works
+
+1. **Fetch Verses** — Retrieve Arabic text + audio from alquran.cloud
+2. **Download Audio** — Download per-ayah recitation audio
+3. **Extract Concepts** — Send verse text to AI provider for visual theme extraction
+4. **Search Footage** — Query Pexels/Pixabay for matching video clips
+5. **Download Clips** — Download best-matching clips
+6. **Generate Subtitles** — Create timed ASS subtitles for Arabic + translation
+7. **Render Video** — Concatenate clips, add audio, burn subtitles with FFmpeg
+
+## API Routes
+
+| Route | Method | Description |
+|---|---|---|
+| `/api/quran/surahs` | GET | List all 114 surahs |
+| `/api/quran/ayahs` | GET | Get ayahs with audio + translation |
+| `/api/generate` | POST | Start video generation |
+| `/api/generate?id=` | GET | Poll generation status |
+| `/api/videos` | GET | List generated videos |
+| `/api/videos/[id]` | GET | Stream/download video |
+| `/api/videos/[id]` | DELETE | Delete video |
+
+## Contributing
+
+Contributions are welcome! Please open an issue or pull request.
+
+## License
+
+[MIT](LICENSE)
