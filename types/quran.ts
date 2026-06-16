@@ -95,10 +95,10 @@ export const AI_PROVIDER_MODELS: Record<AIProvider, { label: string; models: str
   },
   glm: {
     label: 'GLM',
-    models: ['glm-4.7-flash', 'glm-4.7', 'glm-5.1', 'glm-5'],
+    models: ['glm-4.7-flash', 'glm-5.2', 'glm-5.1', 'glm-5', 'glm-4.7'],
     requiresKey: true,
     keyLabel: 'GLM API Key',
-    keyUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
+    keyUrl: 'https://z.ai/manage-apikey/apikey-list',
   },
   openrouter: {
     label: 'OpenRouter (Free)',
