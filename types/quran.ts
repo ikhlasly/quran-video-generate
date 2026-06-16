@@ -88,7 +88,7 @@ export const AI_PROVIDER_MODELS: Record<AIProvider, { label: string; models: str
   },
   deepseek: {
     label: 'DeepSeek',
-    models: ['deepseek-chat', 'deepseek-reasoner', 'deepseek-v4-flash', 'deepseek-v4-pro'],
+    models: ['deepseek-v4-flash', 'deepseek-v4-pro'],
     requiresKey: true,
     keyLabel: 'DeepSeek API Key',
     keyUrl: 'https://platform.deepseek.com/api_keys',
