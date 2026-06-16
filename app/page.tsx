@@ -612,9 +612,11 @@ export default function HomePage() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-6 w-6 text-emerald-600" />
-                <h1 className="text-xl font-bold">{t.appName}</h1>
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-sm shrink-0">
+                  <BookOpen className="h-5 w-5" />
+                </div>
+                <h1 className="text-lg font-bold tracking-tight">{t.appName}</h1>
               </div>
             </div>
             <div className="flex items-center gap-2">
