@@ -303,6 +303,8 @@ export async function renderVideo(
     "1:a:0",
     "-pix_fmt",
     "yuv420p",
+    "-vsync",
+    "cfr",
   ];
 
   if (targetDuration > 0) {
@@ -323,7 +325,7 @@ export async function renderVideo(
 
     ffmpeg()
       .input(concatListPath)
-      .inputOptions(["-f", "concat", "-safe", "0"])
+      .inputOptions(["-f", "concat", "-safe", "0", "-fflags", "+genpts"])
       .input(audio)
       .outputOptions(outputOpts)
       .output(output)
@@ -383,6 +385,8 @@ export async function renderVideoWithoutAudio(
     "-an",
     "-pix_fmt",
     "yuv420p",
+    "-vsync",
+    "cfr",
   ];
 
   if (duration > 0) {
@@ -400,7 +404,7 @@ export async function renderVideoWithoutAudio(
 
     ffmpeg()
       .input(concatListPath)
-      .inputOptions(["-f", "concat", "-safe", "0"])
+      .inputOptions(["-f", "concat", "-safe", "0", "-fflags", "+genpts"])
       .outputOptions(outputOpts)
       .output(output)
       .on("end", () => {
@@ -872,7 +876,7 @@ export function concatenateAudio(
 
     ffmpeg()
       .input(concatListPath)
-      .inputOptions(["-f", "concat", "-safe", "0"])
+      .inputOptions(["-f", "concat", "-safe", "0", "-fflags", "+genpts"])
       .outputOptions(["-c:a", "libmp3lame", "-b:a", "192k"])
       .output(output)
       .on("end", () => {
