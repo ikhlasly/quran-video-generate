@@ -9,8 +9,9 @@ interface SelectContextValue {
   onValueChange: (value: string) => void
   open: boolean
   setOpen: (open: boolean) => void
+  getItemContent: (value: string) => React.ReactNode
   registerItem: (value: string, content: React.ReactNode) => void
-  itemContents: Map<string, React.ReactNode>
+  triggerRef: React.RefObject<HTMLButtonElement | null>
 }
 
 const SelectContext = React.createContext<SelectContextValue | null>(null)
@@ -32,9 +33,12 @@ interface SelectProps {
 function Select({ children, value: controlledValue, defaultValue, onValueChange, disabled }: SelectProps) {
   const [internalValue, setInternalValue] = React.useState(defaultValue || "")
   const [open, setOpen] = React.useState(false)
-  const [itemContents, setItemContents] = React.useState(new Map<string, React.ReactNode>())
+  const itemContentsRef = React.useRef(new Map<string, React.ReactNode>())
+  const triggerRef = React.useRef<HTMLButtonElement>(null)
   const isControlled = controlledValue !== undefined
   const value = isControlled ? controlledValue : internalValue
+  const pendingRegistrations = React.useRef(new Set<string>())
+  const [version, setVersion] = React.useState(0)
 
   const handleValueChange = React.useCallback(
     (v: string) => {
@@ -56,13 +60,21 @@ function Select({ children, value: controlledValue, defaultValue, onValueChange,
 
   const registerItem = React.useCallback(
     (itemValue: string, content: React.ReactNode) => {
-      setItemContents(prev => {
-        const next = new Map(prev)
-        next.set(itemValue, content)
-        return next
-      })
+      const prev = itemContentsRef.current.get(itemValue)
+      if (prev === content && pendingRegistrations.current.has(itemValue)) return
+      itemContentsRef.current.set(itemValue, content)
+      if (!pendingRegistrations.current.has(itemValue)) {
+        pendingRegistrations.current.add(itemValue)
+        setVersion(v => v + 1)
+      }
     },
     []
+  )
+
+  const getItemContent = React.useCallback(
+    (itemValue: string) => itemContentsRef.current.get(itemValue) ?? null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [version, value]
   )
 
   const contextValue = React.useMemo(
@@ -71,10 +83,11 @@ function Select({ children, value: controlledValue, defaultValue, onValueChange,
       onValueChange: handleValueChange,
       open,
       setOpen: handleSetOpen,
+      getItemContent,
       registerItem,
-      itemContents,
+      triggerRef,
     }),
-    [value, handleValueChange, open, handleSetOpen, registerItem, itemContents]
+    [value, handleValueChange, open, handleSetOpen, getItemContent, registerItem]
   )
 
   return (
@@ -87,10 +100,11 @@ function Select({ children, value: controlledValue, defaultValue, onValueChange,
 }
 
 function SelectTrigger({ className, children, ...props }: React.ComponentProps<"button">) {
-  const { open, setOpen } = useSelect()
+  const { open, setOpen, triggerRef } = useSelect()
 
   return (
     <button
+      ref={triggerRef}
       type="button"
       data-slot="select-trigger"
       aria-haspopup="listbox"
@@ -109,22 +123,26 @@ function SelectTrigger({ className, children, ...props }: React.ComponentProps<"
 }
 
 function SelectValue({ placeholder, children }: { placeholder?: string; children?: React.ReactNode }) {
-  const { value, itemContents } = useSelect()
-  const registeredContent = itemContents.get(value)
-  if (value && registeredContent) return <span data-slot="select-value">{registeredContent}</span>
+  const { value, getItemContent } = useSelect()
+  const content = value ? getItemContent(value) : null
+  if (content) return <span data-slot="select-value">{content}</span>
   if (value && children) return <span data-slot="select-value">{children}</span>
   if (value) return <span data-slot="select-value">{value}</span>
   return <span data-slot="select-value" className="text-muted-foreground">{placeholder}</span>
 }
 
 function SelectContent({ className, children, ...props }: React.ComponentProps<"div">) {
-  const { open, setOpen } = useSelect()
+  const { open, setOpen, triggerRef } = useSelect()
   const ref = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
     if (!open) return
     const handleClickOutside = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      const target = e.target as Node
+      if (
+        ref.current && !ref.current.contains(target) &&
+        triggerRef.current && !triggerRef.current.contains(target)
+      ) {
         setOpen(false)
       }
     }
@@ -137,9 +155,21 @@ function SelectContent({ className, children, ...props }: React.ComponentProps<"
       document.removeEventListener("mousedown", handleClickOutside)
       document.removeEventListener("keydown", handleKeyDown)
     }
-  }, [open, setOpen])
+  }, [open, setOpen, triggerRef])
 
-  if (!open) return null
+  if (!open) {
+    return (
+      <div
+        data-slot="select-content"
+        className="absolute top-full left-0 z-50 hidden"
+        aria-hidden="true"
+      >
+        <div className="max-h-60 overflow-y-auto p-1">
+          {children}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div
@@ -186,9 +216,7 @@ function SelectItem({ className, children, value, ...props }: SelectItemProps) {
   const { value: selectedValue, onValueChange, registerItem, setOpen } = useSelect()
   const isSelected = selectedValue === value
 
-  React.useEffect(() => {
-    registerItem(value, children)
-  }, [value, children, registerItem])
+  registerItem(value, children)
 
   return (
     <button

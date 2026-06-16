@@ -1,12 +1,14 @@
 "use client"
 
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { XIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface DialogContextValue {
   open: boolean
   onOpenChange: (open: boolean) => void
+  triggerRef: React.RefObject<HTMLElement | null>
 }
 
 const DialogContext = React.createContext<DialogContextValue | null>(null)
@@ -28,6 +30,7 @@ function Dialog({ children, open: controlledOpen, defaultOpen, onOpenChange }: D
   const [internalOpen, setInternalOpen] = React.useState(defaultOpen || false)
   const isControlled = controlledOpen !== undefined
   const open = isControlled ? controlledOpen : internalOpen
+  const triggerRef = React.useRef<HTMLElement>(null)
 
   const handleOpenChange = React.useCallback(
     (value: boolean) => {
@@ -37,23 +40,26 @@ function Dialog({ children, open: controlledOpen, defaultOpen, onOpenChange }: D
     [isControlled, onOpenChange]
   )
 
+  const ctx = React.useMemo(
+    () => ({ open, onOpenChange: handleOpenChange, triggerRef }),
+    [open, handleOpenChange]
+  )
+
   return (
-    <DialogContext.Provider value={{ open, onOpenChange: handleOpenChange }}>
+    <DialogContext.Provider value={ctx}>
       {children}
     </DialogContext.Provider>
   )
 }
 
-type TriggerProps = React.ComponentPropsWithoutRef<"button"> & { asChild?: boolean }
-
-function DialogTrigger({ children, asChild, ...props }: TriggerProps) {
-  const { onOpenChange } = useDialog()
+function DialogTrigger({ children, asChild, ...props }: React.ComponentPropsWithoutRef<"button"> & { asChild?: boolean }) {
+  const { onOpenChange, triggerRef } = useDialog()
 
   if (asChild && React.isValidElement(children)) {
-    const child = children as React.ReactElement<{ onClick?: React.MouseEventHandler }>
-    return React.cloneElement(child, {
+    return React.cloneElement(children, {
+      ref: triggerRef,
       onClick: (e: React.MouseEvent) => {
-        child.props.onClick?.(e)
+        ;(children.props as { onClick?: React.MouseEventHandler }).onClick?.(e)
         if (!e.defaultPrevented) onOpenChange(true)
       },
       ...props,
@@ -61,22 +67,19 @@ function DialogTrigger({ children, asChild, ...props }: TriggerProps) {
   }
 
   return (
-    <button type="button" data-slot="dialog-trigger" onClick={() => onOpenChange(true)} {...props}>
+    <button ref={triggerRef as React.RefObject<HTMLButtonElement>} type="button" data-slot="dialog-trigger" onClick={() => onOpenChange(true)} {...props}>
       {children}
     </button>
   )
 }
 
-type CloseProps = React.ComponentPropsWithoutRef<"button"> & { asChild?: boolean }
-
-function DialogClose({ children, asChild, ...props }: CloseProps) {
+function DialogClose({ children, asChild, ...props }: React.ComponentPropsWithoutRef<"button"> & { asChild?: boolean }) {
   const { onOpenChange } = useDialog()
 
   if (asChild && React.isValidElement(children)) {
-    const child = children as React.ReactElement<{ onClick?: React.MouseEventHandler }>
-    return React.cloneElement(child, {
+    return React.cloneElement(children, {
       onClick: (e: React.MouseEvent) => {
-        child.props.onClick?.(e)
+        ;(children.props as { onClick?: React.MouseEventHandler }).onClick?.(e)
         onOpenChange(false)
       },
     } as React.HTMLAttributes<HTMLElement>)
@@ -96,12 +99,11 @@ function DialogContent({
   ...props
 }: React.ComponentPropsWithoutRef<"div"> & { showCloseButton?: boolean }) {
   const { open, onOpenChange } = useDialog()
+  const isClient = typeof document !== "undefined"
 
   React.useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden"
-    } else {
-      document.body.style.overflow = ""
     }
     return () => {
       document.body.style.overflow = ""
@@ -110,7 +112,6 @@ function DialogContent({
 
   React.useEffect(() => {
     if (!open) return
-
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onOpenChange(false)
     }
@@ -118,16 +119,20 @@ function DialogContent({
     return () => document.removeEventListener("keydown", handleKeyDown)
   }, [open, onOpenChange])
 
-  if (!open) return null
+  if (!open || !isClient) return null
 
-  return (
-    <div data-slot="dialog-overlay" className="fixed inset-0 z-50 bg-black/50" onClick={() => onOpenChange(false)}>
+  return createPortal(
+    <div
+      data-slot="dialog-overlay"
+      className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center"
+      onClick={() => onOpenChange(false)}
+    >
       <div
         data-slot="dialog-content"
         role="dialog"
         aria-modal="true"
         className={cn(
-          "bg-background fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg sm:max-w-lg",
+          "bg-background relative grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-lg border p-6 shadow-lg sm:max-w-lg",
           className
         )}
         onClick={(e) => e.stopPropagation()}
@@ -139,14 +144,15 @@ function DialogContent({
             type="button"
             data-slot="dialog-close"
             onClick={() => onOpenChange(false)}
-            className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+            className="ring-offset-background focus:ring-ring absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
           >
             <XIcon />
             <span className="sr-only">Close</span>
           </button>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

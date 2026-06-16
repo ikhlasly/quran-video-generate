@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 
@@ -36,8 +37,13 @@ function AlertDialog({ children, open: controlledOpen, onOpenChange }: AlertDial
     [isControlled, onOpenChange]
   )
 
+  const ctx = React.useMemo(
+    () => ({ open, onOpenChange: handleOpenChange }),
+    [open, handleOpenChange]
+  )
+
   return (
-    <AlertDialogContext.Provider value={{ open, onOpenChange: handleOpenChange }}>
+    <AlertDialogContext.Provider value={ctx}>
       {children}
     </AlertDialogContext.Provider>
   )
@@ -47,10 +53,9 @@ function AlertDialogTrigger({ children, asChild, ...props }: React.ComponentProp
   const { onOpenChange } = useAlertDialog()
 
   if (asChild && React.isValidElement(children)) {
-    const child = children as React.ReactElement<{ onClick?: React.MouseEventHandler }>
-    return React.cloneElement(child, {
+    return React.cloneElement(children, {
       onClick: (e: React.MouseEvent) => {
-        child.props.onClick?.(e)
+        ;(children.props as { onClick?: React.MouseEventHandler }).onClick?.(e)
         if (!e.defaultPrevented) onOpenChange(true)
       },
       ...props,
@@ -70,12 +75,11 @@ function AlertDialogContent({
   ...props
 }: React.ComponentPropsWithoutRef<"div">) {
   const { open, onOpenChange } = useAlertDialog()
+  const isClient = typeof document !== "undefined"
 
   React.useEffect(() => {
     if (open) {
       document.body.style.overflow = "hidden"
-    } else {
-      document.body.style.overflow = ""
     }
     return () => {
       document.body.style.overflow = ""
@@ -91,16 +95,20 @@ function AlertDialogContent({
     return () => document.removeEventListener("keydown", handleKeyDown)
   }, [open, onOpenChange])
 
-  if (!open) return null
+  if (!open || !isClient) return null
 
-  return (
-    <div data-slot="alert-dialog-overlay" className="fixed inset-0 z-50 bg-black/50" onClick={() => onOpenChange(false)}>
+  return createPortal(
+    <div
+      data-slot="alert-dialog-overlay"
+      className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center"
+      onClick={() => onOpenChange(false)}
+    >
       <div
         data-slot="alert-dialog-content"
         role="alertdialog"
         aria-modal="true"
         className={cn(
-          "bg-background fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg sm:max-w-lg",
+          "bg-background relative grid w-full max-w-[calc(100%-2rem)] gap-4 rounded-lg border p-6 shadow-lg sm:max-w-lg",
           className
         )}
         onClick={(e) => e.stopPropagation()}
@@ -108,7 +116,8 @@ function AlertDialogContent({
       >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
