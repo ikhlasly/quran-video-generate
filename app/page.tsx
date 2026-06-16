@@ -642,7 +642,7 @@ export default function HomePage() {
                 className="cursor-pointer"
                 aria-label="GitHub"
               >
-                <a href="https://github.com" target="_blank" rel="noopener noreferrer">
+                <a href="https://github.com/ikhlasly/quran-video-generate" target="_blank" rel="noopener noreferrer">
                   <GitHubIcon className="h-5 w-5" />
                 </a>
               </Button>
