@@ -177,9 +177,10 @@ quran-video-generate/
 | Provider | Requires Key | Model IDs | Notes |
 |---|---|---|---|
 | Gemini | Yes | `gemini-3.5-flash`, `gemini-3.1-flash-lite`, `gemini-2.5-flash`, `gemini-2.5-pro` | Recommended default |
+| Anthropic | Yes | `claude-sonnet-4-5`, `claude-haiku-4-5`, `claude-opus-4-1` | — |
 | OpenAI | Yes | `gpt-4o`, `gpt-4o-mini`, `o3-mini`, `gpt-4.1-nano` | — |
-| DeepSeek | Yes | `deepseek-chat`, `deepseek-reasoner`, `deepseek-v4-flash` | Latest V4 available |
-| GLM | Yes | `glm-4.7-flash`, `glm-5.1`, `glm-5` | — |
+| DeepSeek | Yes | `deepseek-v4-flash`, `deepseek-v4-pro` | — |
+| GLM | Yes | `glm-4.7-flash` (free), `glm-5.2`, `glm-5.1`, `glm-5` | — |
 | OpenRouter | Yes | Free models: Nemotron, Gemma 4, Llama 3.3, Qwen3 | Many models available |
 | Ollama | No | `llama3.2`, `mistral`, `qwen2.5`, `gemma2`, `phi4` | Local, self-hosted |
 

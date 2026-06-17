@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { GenerationJob, GenerationConfig, GenerationResult, VideoInfo, VisualConcept, PexelsVideo, PexelsVideoFile, AIProvider } from '@/types/quran';
+import { VIDEO_SOURCES } from '@/types/quran';
 import { ensureStorageDirs, ensureJobDir, getRenderPath, cleanupJobDir, STORAGE_PATHS, readJsonFile, writeJsonFile } from '@/lib/storage';
 import { getAyahs, getSurahs } from '@/lib/quran-api';
 import {
@@ -65,6 +66,26 @@ function getProviderEndpoint(provider: AIProvider, model: string, apiKey: string
       parse: (data) => {
         const candidates = data?.candidates as Array<{ content?: { parts?: Array<{ text?: string }> } }> | undefined;
         return candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+      },
+    };
+  }
+
+  if (provider === 'anthropic') {
+    return {
+      url: 'https://api.anthropic.com/v1/messages',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: (prompt) => ({
+        model,
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      parse: (data) => {
+        const content = data?.content as Array<{ type: string; text?: string }> | undefined;
+        return content?.[0]?.text || '[]';
       },
     };
   }
@@ -139,7 +160,7 @@ Only respond with the JSON array, nothing else.`;
     return [];
   } catch (err) {
     console.error(`AI concept extraction failed (${provider}/${model}):`, err);
-    return generateFallbackConcepts(ayahTexts);
+    throw err;
   }
 }
 
@@ -416,15 +437,26 @@ async function runPipeline(
   const aiModel = config.aiModel || 'gemini-2.5-flash';
   const aiApiKey = config.aiApiKey || config.geminiApiKey || '';
 
+  let aiError = '';
   if (aiApiKey || aiProvider === 'ollama') {
-    concepts = await extractConceptsWithAI(
-      arabic.ayahs.map(a => a.text),
-      aiProvider,
-      aiModel,
-      aiApiKey
-    );
+    try {
+      concepts = await extractConceptsWithAI(
+        arabic.ayahs.map(a => a.text),
+        aiProvider,
+        aiModel,
+        aiApiKey
+      );
+    } catch (err) {
+      aiError = err instanceof Error ? err.message : String(err);
+      concepts = generateFallbackConcepts(arabic.ayahs.map(a => a.text));
+    }
   } else {
     concepts = generateFallbackConcepts(arabic.ayahs.map(a => a.text));
+  }
+
+  if (aiError) {
+    job.message = `AI concept extraction failed (${aiProvider}/${aiModel}): ${aiError}. Using fallback keywords.`;
+    updateJob(job);
   }
 
   // Step 4: Search videos from configured source
@@ -440,28 +472,39 @@ async function runPipeline(
   const videoSource = config.videoSource || 'pexels';
   const videoApiKey = config.videoApiKey || config.pexelsApiKey || '';
 
+  let videoError = '';
   if (videoApiKey && concepts.length > 0) {
-    for (const concept of concepts) {
-      if (usedSearchQueries.has(concept.searchQuery)) continue;
-      usedSearchQueries.add(concept.searchQuery);
+    try {
+      for (const concept of concepts) {
+        if (usedSearchQueries.has(concept.searchQuery)) continue;
+        usedSearchQueries.add(concept.searchQuery);
 
-      const foundUrls = await searchVideos(
-        concept.searchQuery,
-        videoSource,
-        videoApiKey,
-        orientation,
-        10
-      );
+        const foundUrls = await searchVideos(
+          concept.searchQuery,
+          videoSource,
+          videoApiKey,
+          orientation,
+          10
+        );
 
-      // Take up to 2 clips per concept for visual variety
-      const maxClipsPerConcept = 2;
-      let clipsAdded = 0;
-      for (const url of foundUrls) {
-        if (clipsAdded >= maxClipsPerConcept) break;
-        videoUrls.push(url);
-        clipsAdded++;
+        // Take up to 2 clips per concept for visual variety
+        const maxClipsPerConcept = 2;
+        let clipsAdded = 0;
+        for (const url of foundUrls) {
+          if (clipsAdded >= maxClipsPerConcept) break;
+          videoUrls.push(url);
+          clipsAdded++;
+        }
       }
+    } catch (err) {
+      videoError = err instanceof Error ? err.message : String(err);
     }
+  }
+
+  if (videoError) {
+    const prevMsg = job.message;
+    job.message = `${prevMsg} — Video search failed (${VIDEO_SOURCES[videoSource].label}): ${videoError}. Generating background video instead.`;
+    updateJob(job);
   }
 
   // Step 5: Download clips

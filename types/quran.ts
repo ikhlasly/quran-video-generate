@@ -62,7 +62,7 @@ export interface GenerationJob {
   updatedAt: string;
 }
 
-export type AIProvider = 'openai' | 'deepseek' | 'glm' | 'openrouter' | 'gemini' | 'ollama';
+export type AIProvider = 'openai' | 'deepseek' | 'glm' | 'openrouter' | 'gemini' | 'ollama' | 'anthropic';
 export type VideoSource = 'pexels' | 'pixabay';
 export type SubtitlePosition = 'bottom' | 'center' | 'top';
 export type LogoPosition = 'top-left' | 'top-center' | 'top-right' | 'bottom-left' | 'bottom-center' | 'bottom-right';
@@ -126,6 +126,13 @@ export const AI_PROVIDER_MODELS: Record<AIProvider, { label: string; models: str
     requiresKey: false,
     keyLabel: '',
     keyUrl: '',
+  },
+  anthropic: {
+    label: 'Anthropic',
+    models: ['claude-sonnet-4-5', 'claude-haiku-4-5', 'claude-opus-4-1'],
+    requiresKey: true,
+    keyLabel: 'Anthropic API Key',
+    keyUrl: 'https://console.anthropic.com/keys',
   },
 };
 
