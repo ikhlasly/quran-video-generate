@@ -14,7 +14,7 @@
 - **📖 Verse Selection** — Browse all 114 surahs with ayah range selection
 - **🎙️ 100+ Reciters** — Arabic reciters fetched live from alquran.cloud
 - **🌐 50+ Translations** — Multiple languages with grouped dropdowns
-- **🤖 Multi-Provider AI** — OpenAI, DeepSeek, Gemini, GLM, OpenRouter, or local Ollama for visual concept extraction
+- **🤖 7 AI Providers** — Gemini, Anthropic, OpenAI, DeepSeek, GLM, OpenRouter, or local Ollama for visual concept extraction
 - **🎬 Stock Footage** — Pexels or Pixabay integration for background video clips
 - **📝 Dual Subtitles** — Unified ASS subtitle block with Arabic (RTL) + Translation with auto-segmentation
 - **📐 Three Orientations** — Landscape (16:9), Portrait (9:16), Square (1:1)
@@ -57,13 +57,29 @@ Open [http://localhost:3000](http://localhost:3000).
 3. Choose your video source and enter the API key
 4. Click **Save**
 
-> **Without API keys:** The app still works — it generates a gradient background video and uses keyword-based search instead of AI concept extraction.
+> **Without API keys:** The app still works — it generates a gradient background video and uses keyword-based search instead of AI concept extraction. API errors are surfaced clearly in the generation progress so you know what went wrong.
 
 ### FFmpeg Installation
 
-**macOS:** `brew install ffmpeg`
-**Ubuntu/Debian:** `sudo apt update && sudo apt install ffmpeg`
-**Windows:** Download from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH.
+**macOS:**
+```bash
+brew install ffmpeg
+```
+
+**Ubuntu / Debian:**
+```bash
+sudo apt update && sudo apt install ffmpeg
+```
+
+**Windows:**
+Download from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH.
+
+**Verify installation:**
+```bash
+ffmpeg -version
+```
+
+> Without FFmpeg, the app will show a clear error message with installation instructions.
 
 ---
 
