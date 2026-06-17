@@ -693,7 +693,7 @@ export function generateASS(entries: ASSEntry[], options: ASSOptions): string {
   const isPortrait = orientation === "portrait";
   const isSquare = orientation === "square";
 
-  const fontSize = isPortrait ? 14 : isSquare ? 26 : 28;
+  const fontSize = isPortrait ? 18 : isSquare ? 32 : 36;
   const marginL = isPortrait ? 10 : 50;
   const marginR = isPortrait ? 10 : 50;
   const maxChars = isPortrait ? 50 : isSquare ? 80 : 100;
@@ -745,7 +745,7 @@ export function generateCombinedASS(
   const isPortrait = orientation === "portrait";
   const isSquare = orientation === "square";
 
-  const arFontSize = isPortrait ? 14 : isSquare ? 26 : 28;
+  const arFontSize = isPortrait ? 18 : isSquare ? 32 : 36;
   const trFontSize = isPortrait ? 12 : isSquare ? 20 : 20;
   const baseFontSize = isPortrait ? 14 : 18;
   const marginL = isPortrait ? 10 : 50;

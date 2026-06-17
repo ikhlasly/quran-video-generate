@@ -767,7 +767,8 @@ function saveVideoMetadata(info: VideoInfo): void {
 }
 
 export function getVideoMetadata(): VideoInfo[] {
-  return readJsonFile<VideoInfo[]>(STORAGE_PATHS.metadata) || [];
+  const videos = readJsonFile<VideoInfo[]>(STORAGE_PATHS.metadata) || [];
+  return videos.reverse();
 }
 
 export function deleteVideoMetadata(id: string): void {
