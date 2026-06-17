@@ -312,8 +312,13 @@ export async function startGeneration(config: GenerationConfig): Promise<string>
     const j = jobs.get(jobId);
     if (j) {
       j.status = 'failed';
-      j.error = err instanceof Error ? err.message : String(err);
-      j.message = `Failed: ${j.error}`;
+      const rawMsg = err instanceof Error ? err.message : String(err);
+      if (rawMsg.toLowerCase().includes('ffmpeg') || rawMsg.toLowerCase().includes('cannot find')) {
+        j.error = 'FFmpeg is not installed or not in PATH. Install FFmpeg to generate videos: https://ffmpeg.org/download.html';
+      } else {
+        j.error = rawMsg;
+      }
+      j.message = j.error;
       updateJob(j);
     }
     // Clean up temp job files on failure
@@ -400,8 +405,12 @@ async function runPipeline(
     } catch (err) {
       console.error('Audio concatenation failed:', err);
       // Fallback: try using the first audio file directly
-      if (audioPaths.length > 0 && fs.existsSync(audioPaths[0])) {
+      if (audioPaths.length === 1) {
         fs.copyFileSync(audioPaths[0], combinedAudioPath);
+      } else if (audioPaths.length > 0 && fs.existsSync(audioPaths[0])) {
+        fs.copyFileSync(audioPaths[0], combinedAudioPath);
+        job.message = 'FFmpeg not found — using first audio file only. Install FFmpeg for full audio concatenation.';
+        updateJob(job);
       }
     }
   }
@@ -538,7 +547,7 @@ async function runPipeline(
   // Fallback: generate a gradient background video if no clips could be downloaded
   // Use audio duration to set background video length
   if (clipPaths.length === 0) {
-    job.message = 'Generating background video...';
+    job.message = 'No clips downloaded — generating background video...';
     updateJob(job);
     const bgClipPath = path.join(jobDir, 'background.mp4');
     try {
@@ -546,8 +555,12 @@ async function runPipeline(
       await generateBackgroundVideo(bgClipPath, orientation, bgDuration);
       clipPaths.push(bgClipPath);
     } catch (err) {
-      console.error('Failed to generate background video:', err);
-      throw new Error('No video clips could be downloaded and background generation failed');
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        msg.includes('ffmpeg') || msg.includes('FFmpeg')
+          ? 'FFmpeg is not installed or not in PATH. Please install FFmpeg to generate videos. See https://ffmpeg.org/download.html'
+          : `Background video generation failed: ${msg}`
+      );
     }
   }
 
