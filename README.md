@@ -204,6 +204,8 @@ quran-video-generate/
 
 ## 📡 API Reference
 
+> Full interactive API documentation is available at **`/api/docs`** when the dev server is running.
+
 ### Application Routes
 
 | Route | Method | Description |
