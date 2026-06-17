@@ -23,16 +23,10 @@ const html = `<!DOCTYPE html>
   }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--fg); line-height:1.6; }
-  .sidebar { position:fixed; top:0; left:0; width:260px; height:100vh; background:var(--surface); border-right:1px solid var(--border); overflow-y:auto; padding:1.5rem 0; z-index:10; }
-  .sidebar-header { padding:0 1.25rem 1.25rem; border-bottom:1px solid var(--border); margin-bottom:1rem; }
-  .sidebar-header h1 { font-size:1rem; font-weight:700; }
-  .sidebar-header p { font-size:.75rem; color:var(--muted); margin-top:.25rem; }
-  .sidebar-nav { list-style:none; }
-  .sidebar-nav a { display:block; padding:.5rem 1.25rem; font-size:.8rem; color:var(--muted); text-decoration:none; transition:all .15s; border-left:2px solid transparent; }
-  .sidebar-nav a:hover { color:var(--fg); background:var(--code-bg); border-left-color:var(--accent); }
-  .sidebar-nav a.active { color:var(--accent); background:var(--accent-light); border-left-color:var(--accent); }
-  .main { margin-left:260px; padding:2rem 2.5rem; max-width:900px; }
-  .main h2 { font-size:1.5rem; margin:2.5rem 0 1.5rem; padding-bottom:.5rem; border-bottom:2px solid var(--accent); }
+  .container { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
+  .container h2 { font-size:1.5rem; margin:2.5rem 0 1.5rem; padding-bottom:.5rem; border-bottom:2px solid var(--accent); }
+  h1 { font-size: 1.75rem; margin-bottom: .25rem; }
+  .subtitle { color: var(--muted); font-size: .85rem; margin-bottom: 2rem; }
   .tag-group { display:flex; align-items:center; gap:.5rem; margin-bottom:1.5rem; }
   .tag { font-size:.7rem; padding:2px 8px; border-radius:3px; font-weight:600; text-transform:uppercase; }
   .tag.get { color:var(--get); background:var(--get-bg); }
@@ -59,29 +53,13 @@ const html = `<!DOCTYPE html>
   pre { background:var(--code-bg); padding:.85rem 1rem; border-radius:6px; overflow-x:auto; margin:.5rem 0 1rem; font-size:.78rem; line-height:1.5; }
   .schema-section { margin-top:1rem; }
   .schema-section h4 { font-size:.85rem; margin:.75rem 0 .5rem; }
-  footer { margin-top:3rem; padding-top:1.5rem; border-top:1px solid var(--border); color:var(--muted); font-size:.8rem; }
-  @media (max-width:768px) { .sidebar { display:none; } .main { margin-left:0; padding:1rem; } }
+  footer { margin-top:3rem; padding-top:1.5rem; border-top:1px solid var(--border); color:var(--muted); font-size:.8rem; text-align:center; }
 </style>
 </head>
 <body>
-<nav class="sidebar">
-<div class="sidebar-header"><h1>Quran Video API</h1><p>v0.1.0</p></div>
-<ul class="sidebar-nav">
-<li><a href="#quran-data">Quran Data</a></li>
-<li><a href="#video-generation">Video Generation</a></li>
-<li><a href="#video-management">Video Management</a></li>
-<li><a href="#ai-providers">AI Providers</a></li>
-<li><a href="#video-sources">Video Sources</a></li>
-<li><a href="#orientations">Orientations</a></li>
-<li><a href="#subtitle-positions">Subtitle Positions</a></li>
-<li><a href="#logo-positions">Logo Positions</a></li>
-<li><a href="#errors">Errors</a></li>
-</ul>
-</nav>
-
-<main class="main">
-
-<h2 id="quran-data">Quran Data</h2>
+<main class="container">
+<h1>Quran Video Generator</h1>
+<p class="subtitle">API Reference — v0.1.0</p>
 
 <div class="endpoint">
 <div class="ep-header" onclick="this.classList.toggle('open'); this.nextElementSibling.classList.toggle('open')">
@@ -300,20 +278,11 @@ Content-Type: application/json
 <tr><td><code>500</code></td><td>Internal server error</td></tr></table>
 <p class="desc">During generation, API failures are surfaced in the job <code>message</code> field. The pipeline continues with fallbacks (keyword-based concepts, gradient background video).</p>
 
-<footer>Quran Video Generator — v0.1.0 &middot; <a href="/">Back to app</a></footer>
+<footer>Quran Video Generator — v0.1.0 &middot; <a href="/">Back to app</a> &middot; <a href="/api/docs">API Docs</a></footer>
 </main>
 
 <script>
-// Expand first endpoint in each section by default
 document.querySelectorAll('.ep-header').forEach((h,i) => { if(i===0) { h.classList.add('open'); h.nextElementSibling.classList.add('open'); }});
-// Highlight active sidebar link on scroll
-const sections = document.querySelectorAll('h2[id]');
-const links = document.querySelectorAll('.sidebar-nav a');
-window.addEventListener('scroll', () => {
-  let current = '';
-  sections.forEach(s => { if(window.scrollY >= s.offsetTop-80) current = s.id; });
-  links.forEach(l => { l.classList.toggle('active', l.getAttribute('href')==='#'+current); });
-});
 </script>
 </body>
 </html>`;
