@@ -153,6 +153,8 @@ export default function HomePage() {
   const [selectedSurah, setSelectedSurah] = useState<string>('');
   const [startAyah, setStartAyah] = useState<number>(1);
   const [endAyah, setEndAyah] = useState<number>(7);
+  const [startAyahRaw, setStartAyahRaw] = useState('1');
+  const [endAyahRaw, setEndAyahRaw] = useState('7');
   const [selectedReciter, setSelectedReciter] = useState<string>('ar.alafasy');
   const [selectedTranslation, setSelectedTranslation] = useState<string>('en.sahih');
   const [orientation, setOrientation] = useState<string>('landscape');
@@ -263,6 +265,7 @@ export default function HomePage() {
           if (data.surahs.length > 0) {
             setSelectedSurah(String(data.surahs[0].number));
             setEndAyah(data.surahs[0].numberOfAyahs);
+            setEndAyahRaw(String(data.surahs[0].numberOfAyahs));
           }
         }
       } catch (err) {
@@ -348,7 +351,9 @@ export default function HomePage() {
       const surah = prev.find(s => s.number === surahNum);
       if (surah) {
         setStartAyah(1);
+        setStartAyahRaw('1');
         setEndAyah(surah.numberOfAyahs);
+        setEndAyahRaw(String(surah.numberOfAyahs));
       }
       return prev;
     });
@@ -927,8 +932,16 @@ export default function HomePage() {
                         type="number"
                         min={1}
                         max={currentSurah?.numberOfAyahs || 286}
-                        value={startAyah}
-                        onChange={e => setStartAyah(Math.max(1, parseInt(e.target.value) || 1))}
+                        value={startAyahRaw}
+                        onChange={e => {
+                          const raw = e.target.value;
+                          setStartAyahRaw(raw);
+                          const n = parseInt(raw);
+                          if (!isNaN(n) && n >= 1) setStartAyah(n);
+                        }}
+                        onBlur={() => {
+                          setStartAyahRaw(String(startAyah));
+                        }}
                       />
                     </div>
                     <div className="space-y-2">
@@ -937,8 +950,17 @@ export default function HomePage() {
                         type="number"
                         min={startAyah}
                         max={currentSurah?.numberOfAyahs || 286}
-                        value={endAyah}
-                        onChange={e => setEndAyah(Math.min(currentSurah?.numberOfAyahs || 286, parseInt(e.target.value) || 1))}
+                        value={endAyahRaw}
+                        onChange={e => {
+                          const raw = e.target.value;
+                          setEndAyahRaw(raw);
+                          const n = parseInt(raw);
+                          const max = currentSurah?.numberOfAyahs || 286;
+                          if (!isNaN(n) && n >= startAyah && n <= max) setEndAyah(n);
+                        }}
+                        onBlur={() => {
+                          setEndAyahRaw(String(endAyah));
+                        }}
                       />
                     </div>
                   </div>
