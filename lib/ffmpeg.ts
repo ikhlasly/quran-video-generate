@@ -648,8 +648,8 @@ function segmentVerse(
   const isPortrait = orientation === "portrait";
   const isSquare = orientation === "square";
 
-  const maxArabicChars = isPortrait ? 50 : isSquare ? 80 : 100;
-  const maxTranslationChars = isPortrait ? 60 : isSquare ? 90 : 120;
+  const maxArabicChars = isPortrait ? 40 : isSquare ? 65 : 80;
+  const maxTranslationChars = isPortrait ? 45 : isSquare ? 70 : 95;
 
   const arabicNeedsSplit = arabicText.length > maxArabicChars;
   const translationNeedsSplit = translationText.length > maxTranslationChars;
@@ -693,7 +693,7 @@ export function generateASS(entries: ASSEntry[], options: ASSOptions): string {
   const isPortrait = orientation === "portrait";
   const isSquare = orientation === "square";
 
-  const fontSize = isPortrait ? 10 : isSquare ? 20 : 22;
+  const fontSize = isPortrait ? 14 : isSquare ? 26 : 28;
   const marginL = isPortrait ? 10 : 50;
   const marginR = isPortrait ? 10 : 50;
   const maxChars = isPortrait ? 50 : isSquare ? 80 : 100;
@@ -745,9 +745,9 @@ export function generateCombinedASS(
   const isPortrait = orientation === "portrait";
   const isSquare = orientation === "square";
 
-  const arFontSize = isPortrait ? 10 : isSquare ? 20 : 22;
-  const trFontSize = isPortrait ? 9 : isSquare ? 16 : 16;
-  const baseFontSize = isPortrait ? 10 : 18;
+  const arFontSize = isPortrait ? 14 : isSquare ? 26 : 28;
+  const trFontSize = isPortrait ? 12 : isSquare ? 20 : 20;
+  const baseFontSize = isPortrait ? 14 : 18;
   const marginL = isPortrait ? 10 : 50;
   const marginR = isPortrait ? 10 : 50;
 
