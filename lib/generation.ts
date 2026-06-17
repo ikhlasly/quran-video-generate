@@ -547,11 +547,18 @@ async function runPipeline(
     text: ayah.text,
   }));
 
-  const translationAssEntries = translated.ayahs.map((ayah, i) => ({
-    start: subtitleTimings[i].start,
-    end: subtitleTimings[i].end,
-    text: ayah.text,
-  }));
+  // Align translation entries with Arabic by matching numberInSurah.
+  // Different editions may index ayahs differently (e.g. bismillah as separate verse).
+  const translatedBySurah = new Map(translated.ayahs.map(a => [a.numberInSurah, a]));
+  const translationAssEntries = arabic.ayahs.map((_, i) => {
+    const ayahNum = arabic.ayahs[i].numberInSurah;
+    const match = translatedBySurah.get(ayahNum);
+    return {
+      start: subtitleTimings[i].start,
+      end: subtitleTimings[i].end,
+      text: match?.text ?? '',
+    };
+  });
 
   let arabicSubPath: string;
   let translationSubPath: string;
