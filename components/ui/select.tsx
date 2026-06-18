@@ -37,7 +37,6 @@ function Select({ children, value: controlledValue, defaultValue, onValueChange,
   const triggerRef = React.useRef<HTMLButtonElement>(null)
   const isControlled = controlledValue !== undefined
   const value = isControlled ? controlledValue : internalValue
-  const pendingRegistrations = React.useRef(new Set<string>())
   const [version, setVersion] = React.useState(0)
 
   const handleValueChange = React.useCallback(
@@ -61,12 +60,9 @@ function Select({ children, value: controlledValue, defaultValue, onValueChange,
   const registerItem = React.useCallback(
     (itemValue: string, content: React.ReactNode) => {
       const prev = itemContentsRef.current.get(itemValue)
-      if (prev === content && pendingRegistrations.current.has(itemValue)) return
+      if (prev === content) return
       itemContentsRef.current.set(itemValue, content)
-      if (!pendingRegistrations.current.has(itemValue)) {
-        pendingRegistrations.current.add(itemValue)
-        setVersion(v => v + 1)
-      }
+      setVersion(v => v + 1)
     },
     []
   )
@@ -74,7 +70,7 @@ function Select({ children, value: controlledValue, defaultValue, onValueChange,
   const getItemContent = React.useCallback(
     (itemValue: string) => itemContentsRef.current.get(itemValue) ?? null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [version, value]
+    [version]
   )
 
   const contextValue = React.useMemo(
@@ -216,7 +212,9 @@ function SelectItem({ className, children, value, ...props }: SelectItemProps) {
   const { value: selectedValue, onValueChange, registerItem, setOpen } = useSelect()
   const isSelected = selectedValue === value
 
-  registerItem(value, children)
+  React.useEffect(() => {
+    registerItem(value, children)
+  }, [value, registerItem]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <button
