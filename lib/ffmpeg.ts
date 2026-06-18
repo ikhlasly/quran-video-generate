@@ -783,7 +783,8 @@ export function generateCombinedASS(
       if (arabic && translation) {
         combinedText =
           `{\\fn${fontName}}{\\fs${arFontSize}}{\\q0}\u202B${arabic}` +
-          `\\N{\\fnArial}{\\fs${trFontSize}}{\\q0}${translation}`;
+          `\\N{\\fs4}\\N` +
+          `{\\fnArial}{\\fs${trFontSize}}{\\q0}${translation}`;
       } else if (arabic) {
         combinedText = `{\\fn${fontName}}{\\fs${arFontSize}}{\\q0}\u202B${arabic}`;
       } else if (translation) {
