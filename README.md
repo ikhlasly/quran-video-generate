@@ -62,11 +62,13 @@ Open [http://localhost:3000](http://localhost:3000).
 ### FFmpeg Installation
 
 **macOS:**
+
 ```bash
 brew install ffmpeg
 ```
 
 **Ubuntu / Debian:**
+
 ```bash
 sudo apt update && sudo apt install ffmpeg
 ```
@@ -75,6 +77,7 @@ sudo apt update && sudo apt install ffmpeg
 Download from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH.
 
 **Verify installation:**
+
 ```bash
 ffmpeg -version
 ```
@@ -87,62 +90,18 @@ ffmpeg -version
 
 ### Tech Stack
 
-| Layer | Technology |
-|---|---|
-| **Framework** | Next.js 16 (App Router) |
-| **Language** | TypeScript 5 |
-| **Styling** | Tailwind CSS 4 |
-| **Video Processing** | FFmpeg (fluent-ffmpeg) |
-| **Quran Data** | [alquran.cloud API](https://alquran.cloud/api) + [QuranPedia API](https://quranpedia.net) |
-| **Stock Footage** | Pexels / Pixabay API |
-| **AI Providers** | OpenAI, DeepSeek, Gemini, GLM, OpenRouter, Ollama |
-| **UI Components** | Custom lightweight (no Radix, no shadcn) |
-| **Theming** | next-themes |
-| **Toasts** | Sonner |
-
-### Project Structure
-
-```
-quran-video-generate/
-├── app/
-│   ├── api/
-│   │   ├── docs/route.ts            # Interactive API docs
-│   │   ├── generate/route.ts        # Video generation endpoint
-│   │   ├── quran/
-│   │   │   ├── surahs/route.ts      # Surah list endpoint
-│   │   │   ├── ayahs/route.ts       # Ayah data endpoint
-│   │   │   └── reciters/route.ts    # Merged reciters (alquran.cloud + QuranPedia)
-│   │   └── videos/
-│   │       ├── route.ts             # Video list endpoint
-│   │       └── [id]/route.ts        # Video stream & delete
-│   ├── layout.tsx                   # Root layout
-│   ├── page.tsx                     # Main page
-│   └── globals.css                  # Global styles
-├── components/ui/                   # UI primitives (no Radix)
-│   ├── button.tsx, badge.tsx        # Button & badge with variants
-│   ├── card.tsx                     # Card layout
-│   ├── dialog.tsx                   # Modal dialog (portal-based)
-│   ├── alert-dialog.tsx             # Confirmation dialog
-│   ├── select.tsx                   # Custom dropdown
-│   ├── tabs.tsx                     # Tab navigation
-│   ├── github-icon.tsx              # GitHub SVG icon
-│   ├── input.tsx, label.tsx         # Form controls
-│   ├── progress.tsx                 # Progress bar
-│   ├── scroll-area.tsx              # Scrollable container
-│   ├── separator.tsx                # Visual divider
-│   └── slot.tsx                     # Slot pattern
-├── lib/
-│   ├── generation.ts                # Video generation pipeline
-│   ├── ffmpeg.ts                    # FFmpeg operations (ASS subtitles, rendering)
-│   ├── quran-api.ts                 # alquran.cloud API client with caching
-│   ├── quranpedia.ts                # QuranPedia reciters service
-│   ├── i18n.ts                      # 26-language translation map
-│   ├── storage.ts                   # File system storage
-│   └── utils.ts                     # cn() utility
-├── types/
-│   └── quran.ts                     # TypeScript interfaces
-└── storage/                          # Generated videos & metadata (gitignored)
-```
+| Layer                | Technology                                                                                |
+| -------------------- | ----------------------------------------------------------------------------------------- |
+| **Framework**        | Next.js 16 (App Router)                                                                   |
+| **Language**         | TypeScript 5                                                                              |
+| **Styling**          | Tailwind CSS 4                                                                            |
+| **Video Processing** | FFmpeg (fluent-ffmpeg)                                                                    |
+| **Quran Data**       | [alquran.cloud API](https://alquran.cloud/api) + [QuranPedia API](https://quranpedia.net) |
+| **Stock Footage**    | Pexels / Pixabay API                                                                      |
+| **AI Providers**     | OpenAI, DeepSeek, Gemini, GLM, OpenRouter, Ollama                                         |
+| **UI Components**    | Custom lightweight (no Radix, no shadcn)                                                  |
+| **Theming**          | next-themes                                                                               |
+| **Toasts**           | Sonner                                                                                    |
 
 ---
 
@@ -184,25 +143,25 @@ quran-video-generate/
 
 ### Font Sizes by Orientation
 
-| Orientation | Arabic Font | Translation Font |
-|---|---|---|
-| Landscape (1920×1080) | 22px (Amiri) | 16px (Arial) |
-| Square (1080×1080) | 20px (Amiri) | 16px (Arial) |
-| Portrait (1080×1920) | 10px (Amiri) | 9px (Arial) |
+| Orientation           | Arabic Font  | Translation Font |
+| --------------------- | ------------ | ---------------- |
+| Landscape (1920×1080) | 22px (Amiri) | 16px (Arial)     |
+| Square (1080×1080)    | 20px (Amiri) | 16px (Arial)     |
+| Portrait (1080×1920)  | 10px (Amiri) | 9px (Arial)      |
 
 ---
 
 ## 🤖 AI Providers
 
-| Provider | Requires Key | Model IDs | Notes |
-|---|---|---|---|
-| Gemini | Yes | `gemini-3.5-flash`, `gemini-3.1-flash-lite`, `gemini-2.5-flash`, `gemini-2.5-pro` | Recommended default |
-| Anthropic | Yes | `claude-sonnet-4-5`, `claude-haiku-4-5`, `claude-opus-4-1` | — |
-| OpenAI | Yes | `gpt-4o`, `gpt-4o-mini`, `o3-mini`, `gpt-4.1-nano` | — |
-| DeepSeek | Yes | `deepseek-v4-flash`, `deepseek-v4-pro` | — |
-| GLM | Yes | `glm-4.7-flash` (free), `glm-5.2`, `glm-5.1`, `glm-5` | — |
-| OpenRouter | Yes | Free models: Nemotron, Gemma 4, Llama 3.3, Qwen3 | Many models available |
-| Ollama | No | `llama3.2`, `mistral`, `qwen2.5`, `gemma2`, `phi4` | Local, self-hosted |
+| Provider   | Requires Key | Model IDs                                                                         | Notes                 |
+| ---------- | ------------ | --------------------------------------------------------------------------------- | --------------------- |
+| Gemini     | Yes          | `gemini-3.5-flash`, `gemini-3.1-flash-lite`, `gemini-2.5-flash`, `gemini-2.5-pro` | Recommended default   |
+| Anthropic  | Yes          | `claude-sonnet-4-5`, `claude-haiku-4-5`, `claude-opus-4-1`                        | —                     |
+| OpenAI     | Yes          | `gpt-4o`, `gpt-4o-mini`, `o3-mini`, `gpt-4.1-nano`                                | —                     |
+| DeepSeek   | Yes          | `deepseek-v4-flash`, `deepseek-v4-pro`                                            | —                     |
+| GLM        | Yes          | `glm-4.7-flash` (free), `glm-5.2`, `glm-5.1`, `glm-5`                             | —                     |
+| OpenRouter | Yes          | Free models: Nemotron, Gemma 4, Llama 3.3, Qwen3                                  | Many models available |
+| Ollama     | No           | `llama3.2`, `mistral`, `qwen2.5`, `gemma2`, `phi4`                                | Local, self-hosted    |
 
 ---
 
@@ -212,24 +171,24 @@ quran-video-generate/
 
 ### Application Routes
 
-| Route | Method | Description |
-|---|---|---|
-| `/api/quran/surahs` | GET | List all 114 surahs |
-| `/api/quran/ayahs` | GET | Get ayahs with audio + translation |
-| `/api/generate` | POST | Start video generation |
-| `/api/generate?id=` | GET | Poll generation status |
-| `/api/videos` | GET | List generated videos |
-| `/api/videos/[id]` | GET | Stream/download video |
-| `/api/videos/[id]` | DELETE | Delete video |
+| Route               | Method | Description                        |
+| ------------------- | ------ | ---------------------------------- |
+| `/api/quran/surahs` | GET    | List all 114 surahs                |
+| `/api/quran/ayahs`  | GET    | Get ayahs with audio + translation |
+| `/api/generate`     | POST   | Start video generation             |
+| `/api/generate?id=` | GET    | Poll generation status             |
+| `/api/videos`       | GET    | List generated videos              |
+| `/api/videos/[id]`  | GET    | Stream/download video              |
+| `/api/videos/[id]`  | DELETE | Delete video                       |
 
 ### External APIs
 
-| API | Usage |
-|---|---|
+| API                                        | Usage                                      |
+| ------------------------------------------ | ------------------------------------------ |
 | [alquran.cloud](https://alquran.cloud/api) | Quran text, audio recitation, translations |
-| [QuranPedia](https://quranpedia.net) | Reciter database, audio download URLs |
-| [Pexels](https://www.pexels.com/api/) | Stock video footage |
-| [Pixabay](https://pixabay.com/api/docs/) | Stock video footage (alternative) |
+| [QuranPedia](https://quranpedia.net)       | Reciter database, audio download URLs      |
+| [Pexels](https://www.pexels.com/api/)      | Stock video footage                        |
+| [Pixabay](https://pixabay.com/api/docs/)   | Stock video footage (alternative)          |
 
 ---
 
@@ -246,13 +205,13 @@ bun dev
 
 ### Commands
 
-| Command | Description |
-|---|---|
-| `bun dev` | Start development server |
-| `bun run build` | Production build |
-| `bun start` | Start production server |
-| `bun run lint` | Run ESLint |
-| `npx tsc --noEmit` | TypeScript type check |
+| Command            | Description              |
+| ------------------ | ------------------------ |
+| `bun dev`          | Start development server |
+| `bun run build`    | Production build         |
+| `bun start`        | Start production server  |
+| `bun run lint`     | Run ESLint               |
+| `npx tsc --noEmit` | TypeScript type check    |
 
 ### Guidelines
 
