@@ -12,7 +12,7 @@
 ## ✨ Features
 
 - **📖 Verse Selection** — Browse all 114 surahs with ayah range selection
-- **🎙️ 100+ Reciters** — Arabic reciters fetched live from alquran.cloud
+- **🎙️ 200+ Reciters** — Merged from alquran.cloud + QuranPedia, with Arabic names and English transliteration, audio downloaded directly from reciter servers
 - **🌐 50+ Translations** — Multiple languages with grouped dropdowns
 - **🤖 7 AI Providers** — Gemini, Anthropic, OpenAI, DeepSeek, GLM, OpenRouter, or local Ollama for visual concept extraction
 - **🎬 Stock Footage** — Pexels or Pixabay integration for background video clips
@@ -93,7 +93,7 @@ ffmpeg -version
 | **Language** | TypeScript 5 |
 | **Styling** | Tailwind CSS 4 |
 | **Video Processing** | FFmpeg (fluent-ffmpeg) |
-| **Quran Data** | [alquran.cloud API](https://alquran.cloud/api) |
+| **Quran Data** | [alquran.cloud API](https://alquran.cloud/api) + [QuranPedia API](https://quranpedia.net) |
 | **Stock Footage** | Pexels / Pixabay API |
 | **AI Providers** | OpenAI, DeepSeek, Gemini, GLM, OpenRouter, Ollama |
 | **UI Components** | Custom lightweight (no Radix, no shadcn) |
@@ -159,7 +159,7 @@ quran-video-generate/
 ### Step-by-Step Flow
 
 1. **Select a Surah** and ayah range
-2. **Choose a Reciter** from 100+ Arabic reciters
+2. **Choose a Reciter** from 200+ Arabic reciters (alquran.cloud + QuranPedia)
 3. **Pick a Translation** from 50+ translations
 4. **Set Orientation** (Landscape, Portrait, or Square)
 5. **Configure Subtitles** — visibility, position, logo text
@@ -288,6 +288,7 @@ bun dev
 ## 🙏 Acknowledgments
 
 - **[alquran.cloud](https://alquran.cloud/)** — Free Quran API with recitations and translations
+- **[QuranPedia](https://quranpedia.net/)** — Reciter database and audio files
 - **[Pexels](https://www.pexels.com/)** / **[Pixabay](https://pixabay.com/)** — Free stock video footage
 - **[FFmpeg](https://ffmpeg.org/)** — Video processing backbone
 - **[Next.js](https://nextjs.org/)** — React framework
