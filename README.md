@@ -227,6 +227,7 @@ quran-video-generate/
 | API | Usage |
 |---|---|
 | [alquran.cloud](https://alquran.cloud/api) | Quran text, audio recitation, translations |
+| [QuranPedia](https://quranpedia.net) | Reciter database, audio download URLs |
 | [Pexels](https://www.pexels.com/api/) | Stock video footage |
 | [Pixabay](https://pixabay.com/api/docs/) | Stock video footage (alternative) |
 
