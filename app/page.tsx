@@ -25,7 +25,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 
-import type { Surah, Reciter, GenerationJob, VideoInfo, AyahEdition, AIProvider, VideoSource, SubtitlePosition, LogoPosition } from '@/types/quran';
+import type { Surah, UnifiedReciter, ReciterSource, GenerationJob, VideoInfo, AyahEdition, AIProvider, VideoSource, SubtitlePosition, LogoPosition } from '@/types/quran';
 import { AI_PROVIDER_MODELS, VIDEO_SOURCES } from '@/types/quran';
 import { getTranslations, LOCALE_OPTIONS, type Locale } from '@/lib/i18n';
 
@@ -60,14 +60,15 @@ interface TranslationEdition {
   direction: string | null;
 }
 
-// Fallback data
-const FALLBACK_RECITERS: Reciter[] = [
-  { identifier: 'ar.alafasy', language: 'ar', name: 'مشاري العفاسي', englishName: 'Mishary Rashid Alafasy', format: 'audio', type: 'versebyverse', direction: null },
-  { identifier: 'ar.abdurrahmaansudais', language: 'ar', name: 'عبد الرحمن السديس', englishName: 'Abdurrahmaan As-Sudais', format: 'audio', type: 'versebyverse', direction: null },
-  { identifier: 'ar.abdulbasitmurattal', language: 'ar', name: 'عبد الباسط عبد الصمد', englishName: 'Abdul Basit (Murattal)', format: 'audio', type: 'versebyverse', direction: null },
-  { identifier: 'ar.husary', language: 'ar', name: 'محمود خليل الحصري', englishName: 'Mahmoud Khalil Al-Husary', format: 'audio', type: 'versebyverse', direction: null },
-  { identifier: 'ar.minshawi', language: 'ar', name: 'محمد صديق المنشاوي', englishName: 'Mohamed Siddiq Al-Minshawi', format: 'audio', type: 'versebyverse', direction: null },
-  { identifier: 'ar.ahmedajamy', language: 'ar', name: 'أحمد العجمي', englishName: 'Ahmed Ibn Ali Al-Ajamy', format: 'audio', type: 'versebyverse', direction: null },
+// Fallback data — unified reciters (AlQuran source). Used until the unified
+// /api/quran/reciters endpoint responds, and as a last-resort if it fails.
+const FALLBACK_UNIFIED_RECITERS: UnifiedReciter[] = [
+  { id: 'alquran:ar.alafasy', source: 'alquran', providerId: 'ar.alafasy', identifier: 'ar.alafasy', name: 'مشاري العفاسي', englishName: 'Mishary Rashid Alafasy', language: 'ar', format: 'audio', type: 'versebyverse', direction: null, metadata: 'Verse-by-verse' },
+  { id: 'alquran:ar.abdurrahmaansudais', source: 'alquran', providerId: 'ar.abdurrahmaansudais', identifier: 'ar.abdurrahmaansudais', name: 'عبد الرحمن السديس', englishName: 'Abdurrahmaan As-Sudais', language: 'ar', format: 'audio', type: 'versebyverse', direction: null, metadata: 'Verse-by-verse' },
+  { id: 'alquran:ar.abdulbasitmurattal', source: 'alquran', providerId: 'ar.abdulbasitmurattal', identifier: 'ar.abdulbasitmurattal', name: 'عبد الباسط عبد الصمد', englishName: 'Abdul Basit (Murattal)', language: 'ar', format: 'audio', type: 'versebyverse', direction: null, metadata: 'Verse-by-verse' },
+  { id: 'alquran:ar.husary', source: 'alquran', providerId: 'ar.husary', identifier: 'ar.husary', name: 'محمود خليل الحصري', englishName: 'Mahmoud Khalil Al-Husary', language: 'ar', format: 'audio', type: 'versebyverse', direction: null, metadata: 'Verse-by-verse' },
+  { id: 'alquran:ar.minshawi', source: 'alquran', providerId: 'ar.minshawi', identifier: 'ar.minshawi', name: 'محمد صديق المنشاوي', englishName: 'Mohamed Siddiq Al-Minshawi', language: 'ar', format: 'audio', type: 'versebyverse', direction: null, metadata: 'Verse-by-verse' },
+  { id: 'alquran:ar.ahmedajamy', source: 'alquran', providerId: 'ar.ahmedajamy', identifier: 'ar.ahmedajamy', name: 'أحمد العجمي', englishName: 'Ahmed Ibn Ali Al-Ajamy', language: 'ar', format: 'audio', type: 'versebyverse', direction: null, metadata: 'Verse-by-verse' },
 ];
 
 const FALLBACK_TRANSLATIONS: TranslationEdition[] = [
@@ -145,7 +146,8 @@ export default function HomePage() {
 
   // Surah data
   const [surahs, setSurahs] = useState<Surah[]>([]);
-  const [reciters, setReciters] = useState<Reciter[]>(FALLBACK_RECITERS.sort((a, b) => a.englishName.localeCompare(b.englishName)));
+  const [reciters, setReciters] = useState<UnifiedReciter[]>([...FALLBACK_UNIFIED_RECITERS].sort((a, b) => a.englishName.localeCompare(b.englishName)));
+  const [recitersLoading, setRecitersLoading] = useState(false);
   const [translations, setTranslations] = useState<TranslationEdition[]>(FALLBACK_TRANSLATIONS);
   const [dataLoading, setDataLoading] = useState(true);
 
@@ -155,7 +157,9 @@ export default function HomePage() {
   const [endAyah, setEndAyah] = useState<number>(7);
   const [startAyahRaw, setStartAyahRaw] = useState('1');
   const [endAyahRaw, setEndAyahRaw] = useState('7');
-  const [selectedReciter, setSelectedReciter] = useState<string>('ar.alafasy');
+  // selectedReciter holds the UNIFIED reciter id (e.g. `alquran:ar.alafasy`),
+  // which works for both AlQuran and QuranPedia sources.
+  const [selectedReciter, setSelectedReciter] = useState<string>('alquran:ar.alafasy');
   const [selectedTranslation, setSelectedTranslation] = useState<string>('en.sahih');
   const [orientation, setOrientation] = useState<string>('landscape');
   const [subtitleMode, setSubtitleMode] = useState<SubtitleMode>(() => {
@@ -277,23 +281,33 @@ export default function HomePage() {
     return () => { cancelled = true; };
   }, []);
 
-  // Fetch reciters and translations client-side from alquran.cloud
+  // Fetch reciters from the unified /api/quran/reciters endpoint (merges
+  // AlQuran + QuranPedia) and translations from alquran.cloud. Both sources
+  // are loaded in parallel; either failing leaves the fallback list in place.
   useEffect(() => {
     let cancelled = false;
     async function fetchEditions() {
+      setRecitersLoading(true);
       try {
         const [recitersRes, translationsRes] = await Promise.all([
-          fetch('https://api.alquran.cloud/v1/edition?format=audio&type=versebyverse'),
+          fetch('/api/quran/reciters'),
           fetch('https://api.alquran.cloud/v1/edition?type=translation'),
         ]);
 
         if (!cancelled) {
           if (recitersRes.ok) {
             const data = await recitersRes.json();
-            if (data.code === 200 && data.data) {
-              const arabic = (data.data as Reciter[]).filter(r => r.language === 'ar');
-              arabic.sort((a, b) => a.englishName.localeCompare(b.englishName));
-              setReciters(arabic);
+            if (Array.isArray(data.reciters) && data.reciters.length > 0) {
+              const sorted = [...(data.reciters as UnifiedReciter[])].sort((a, b) =>
+                (a.englishName || a.name).localeCompare(b.englishName || b.name),
+              );
+              setReciters(sorted);
+              // Keep current selection valid; otherwise fall back to Alafasy.
+              setSelectedReciter((prev) => {
+                if (sorted.some((r) => r.id === prev)) return prev;
+                const alafasy = sorted.find((r) => r.id === 'alquran:ar.alafasy');
+                return alafasy ? alafasy.id : sorted[0].id;
+              });
             }
           }
 
@@ -318,6 +332,8 @@ export default function HomePage() {
         if (!cancelled) {
           // Already using fallback from initial state
         }
+      } finally {
+        if (!cancelled) setRecitersLoading(false);
       }
     }
     fetchEditions();
@@ -357,16 +373,53 @@ export default function HomePage() {
       }
       return prev;
     });
-  }, []);
+    // Verify the selected reciter still has audio for the new surah. If not,
+    // auto-select the first available reciter so the user is never left with
+    // an un-generatable choice. (AlQuran reciters are always available.)
+    const hasAudio = (r: UnifiedReciter) => {
+      if (r.source !== 'quranpedia') return true;
+      const moshaf = r.preferredMoshaf ?? r.moshaf?.[0];
+      if (!moshaf?.surahs) return true;
+      return moshaf.surahs.includes(surahNum);
+    };
+    const currentStillAvailable = reciters.some((r) => r.id === selectedReciter && hasAudio(r));
+    if (!currentStillAvailable) {
+      const firstAvailable = reciters.find(hasAudio);
+      if (firstAvailable) setSelectedReciter(firstAvailable.id);
+    }
+  }, [reciters, selectedReciter]);
 
   // Preview
   const handlePreview = async () => {
     setPreviewLoading(true);
     setCurrentAyahIndex(0);
     try {
-      const res = await fetch(
-        `/api/quran/ayahs?surah=${selectedSurah}&startAyah=${startAyah}&endAyah=${endAyah}&reciter=${selectedReciter}&translation=${selectedTranslation}`
-      );
+      // Resolve the selected unified reciter so we can pass source-aware
+      // params to the ayahs endpoint (AlQuran unchanged; QuranPedia overrides
+      // audio URLs server-side).
+      const reciterObj = reciters.find((r) => r.id === selectedReciter);
+      const reciterSource: ReciterSource = reciterObj?.source ?? 'alquran';
+      const reciterForText =
+        reciterSource === 'quranpedia' ? 'ar.alafasy' : (reciterObj?.identifier ?? 'ar.alafasy');
+
+      const params = new URLSearchParams({
+        surah: selectedSurah,
+        startAyah: String(startAyah),
+        endAyah: String(endAyah),
+        reciter: reciterForText,
+        translation: selectedTranslation,
+        reciterSource,
+      });
+      if (reciterObj) {
+        params.set('reciterUnifiedId', reciterObj.id);
+        const moshaf = reciterObj.preferredMoshaf ?? reciterObj.moshaf?.[0];
+        if (moshaf?.server) {
+          params.set('reciterMoshafServer', moshaf.server);
+          params.set('reciterMoshafType', moshaf.moshafType ?? 'unknown');
+        }
+      }
+
+      const res = await fetch(`/api/quran/ayahs?${params.toString()}`);
       const data = await res.json();
       setPreviewData(data);
     } catch (err) {
@@ -426,8 +479,20 @@ export default function HomePage() {
     setJob(null);
     try {
       const surah = surahs.find(s => s.number === parseInt(selectedSurah));
-      const reciterObj = reciters.find(r => r.identifier === selectedReciter);
+      const reciterObj = reciters.find(r => r.id === selectedReciter);
       const translationObj = translations.find(t => t.identifier === selectedTranslation);
+
+      // Resolve source-specific fields. `reciter` is always a valid AlQuran
+      // edition identifier (or a stable default for QuranPedia) so the
+      // existing getAyahs() text-fetch path keeps working unchanged. The
+      // actual audio source is controlled by `reciterSource`.
+      const reciterSource: ReciterSource = reciterObj?.source ?? 'alquran';
+      const reciterIdentifier =
+        reciterSource === 'quranpedia'
+          ? 'ar.alafasy'
+          : (reciterObj?.identifier ?? selectedReciter);
+      const moshaf = reciterObj?.preferredMoshaf ?? reciterObj?.moshaf?.[0];
+
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -435,8 +500,13 @@ export default function HomePage() {
           surah: parseInt(selectedSurah),
           startAyah,
           endAyah,
-          reciter: selectedReciter,
+          reciter: reciterIdentifier,
           reciterName: reciterObj?.englishName || selectedReciter,
+          reciterSource,
+          reciterProviderId: reciterObj?.providerId,
+          reciterUnifiedId: reciterObj?.id,
+          reciterMoshafServer: moshaf?.server,
+          reciterMoshafType: moshaf?.moshafType,
           translation: selectedTranslation,
           translationName: translationObj?.englishName || selectedTranslation,
           surahName: surah ? `${surah.englishName} - ${surah.name}` : `Surah ${selectedSurah}`,
@@ -602,6 +672,40 @@ export default function HomePage() {
     }
     return groups;
   }, [translations]);
+
+  // Filter reciters to only those with audio available for the selected surah.
+  // AlQuran reciters are comprehensive (always available). QuranPedia reciters
+  // carry a `surahs` list on each moshaf; we verify the selected surah is
+  // present in the preferred moshaf's list before showing the reciter, so the
+  // UI only lists reciters whose audio is actually available.
+  const selectedSurahNum = parseInt(selectedSurah) || 1;
+  const availableReciters = useMemo(() => {
+    return reciters.filter((r) => {
+      // AlQuran reciters have no moshaf metadata — assume always available.
+      if (r.source !== 'quranpedia') return true;
+      const moshaf = r.preferredMoshaf ?? r.moshaf?.[0];
+      // No moshaf or no surah list → can't verify, keep it (the download step
+      // handles missing audio gracefully).
+      if (!moshaf?.surahs) return true;
+      return moshaf.surahs.includes(selectedSurahNum);
+    });
+  }, [reciters, selectedSurahNum]);
+
+  // Group available reciters by source for the dropdown.
+  const groupedReciters = useMemo(() => {
+    const groups: { source: ReciterSource; label: string; items: UnifiedReciter[] }[] = [];
+    const alquran = availableReciters.filter((r) => r.source === 'alquran');
+    const quranpedia = availableReciters.filter((r) => r.source === 'quranpedia');
+    if (alquran.length) groups.push({ source: 'alquran', label: 'AlQuran Cloud', items: alquran });
+    if (quranpedia.length) groups.push({ source: 'quranpedia', label: 'QuranPedia', items: quranpedia });
+    return groups;
+  }, [availableReciters]);
+
+  // Resolve the currently-selected reciter object (for metadata display).
+  const selectedReciterObj = useMemo(
+    () => reciters.find((r) => r.id === selectedReciter) ?? null,
+    [reciters, selectedReciter],
+  );
 
   if (!mounted) {
     return (
@@ -965,23 +1069,70 @@ export default function HomePage() {
                     </div>
                   </div>
 
-                  {/* Reciter */}
+                  {/* Reciter (unified: AlQuran + QuranPedia) */}
                   <div className="space-y-2">
-                    <Label>{t.reciter}</Label>
+                    <div className="flex items-center justify-between gap-2">
+                      <Label>{t.reciter}</Label>
+                      <span className="text-[10px] text-muted-foreground tabular-nums">
+                        {recitersLoading ? 'loading…' : `${availableReciters.length} available`}
+                      </span>
+                    </div>
+
                     <Select value={selectedReciter} onValueChange={setSelectedReciter}>
                       <SelectTrigger className="cursor-pointer">
                         <SelectValue placeholder={t.reciter} />
                       </SelectTrigger>
                       <SelectContent>
                         <ScrollArea className="h-72">
-                          {reciters.map(r => (
-                            <SelectItem key={r.identifier} value={r.identifier} className="cursor-pointer">
-                              {r.englishName}
-                            </SelectItem>
+                          {groupedReciters.length === 0 && (
+                            <div className="px-2 py-3 text-xs text-muted-foreground text-center">
+                              No reciters available for this surah.
+                            </div>
+                          )}
+                          {groupedReciters.map((group) => (
+                            <SelectGroup key={group.source}>
+                              <SelectLabel className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+                                <span>{group.label}</span>
+                                <span className="text-[10px] font-normal opacity-70">{group.items.length}</span>
+                              </SelectLabel>
+                              {group.items.map((r) => (
+                                <SelectItem key={r.id} value={r.id} className="cursor-pointer">
+                                  <span className="flex items-center gap-2">
+                                    <span className="truncate">{r.englishName || r.name}</span>
+                                    {r.metadata && (
+                                      <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                        {r.metadata}
+                                      </span>
+                                    )}
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
                           ))}
                         </ScrollArea>
                       </SelectContent>
                     </Select>
+
+                    {/* Selected reciter metadata (style + moshaf info) */}
+                    {selectedReciterObj && (
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                        {selectedReciterObj.style && (
+                          <span className="inline-flex items-center gap-1">
+                            <Sparkles className="h-3 w-3" />
+                            {selectedReciterObj.style}
+                          </span>
+                        )}
+                        {selectedReciterObj.preferredMoshaf?.moshafType && (
+                          <span>
+                            {selectedReciterObj.preferredMoshaf.moshafType === 'versebyverse'
+                              ? 'Verse-by-verse audio'
+                              : selectedReciterObj.preferredMoshaf.moshafType === 'gapless'
+                                ? 'Gapless (full-surah)'
+                                : 'Audio source unknown'}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Translation */}
@@ -1133,7 +1284,7 @@ export default function HomePage() {
               </Card>
 
               {/* Step 2: Preview */}
-              <Card>
+              <Card className="flex-1">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Volume2 className="h-5 w-5 text-emerald-600" />
@@ -1141,13 +1292,13 @@ export default function HomePage() {
                   </CardTitle>
                   <CardDescription>{t.previewDesc}</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex flex-col flex-1">
                   <Tabs value={previewTab} onValueChange={(v) => {
                     setPreviewTab(v as 'verse' | 'video');
                     if (v === 'video') {
                       setVideoPreviewOrientation((orientation || 'landscape') as 'portrait' | 'landscape' | 'square');
                     }
-                  }}>
+                  }} className="flex-1 flex flex-col">
                     <TabsList className="grid w-full grid-cols-2 mb-4">
                       <TabsTrigger value="verse" className="cursor-pointer gap-1.5">
                         <BookOpen className="h-3.5 w-3.5" />
@@ -1160,16 +1311,19 @@ export default function HomePage() {
                     </TabsList>
 
                     {/* Verse Preview Tab */}
-                    <TabsContent value="verse" className="mt-0">
+                    <TabsContent value="verse" className="mt-0 flex-1 flex flex-col">
                       {!previewData ? (
                         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                           <BookOpen className="h-12 w-12 mb-3 opacity-30" />
                           <p className="text-sm">{t.previewPlaceholder}</p>
                         </div>
                       ) : (
-                        <div className="flex flex-col min-h-[320px]">
-                          {/* Ayah display */}
-                          <ScrollArea className="flex-1 h-64">
+                        <div className="flex flex-col flex-1">
+                          {/* Ayah display — strictly bounded height so the play controls below stay visible.
+                              Previously `flex-1 h-64` let the ScrollArea grow with content (flex-basis: 0%
+                              + min-height: auto), which pushed the play button off-screen on long surahs.
+                              A fixed `h-72` with `min-h-0` guarantees internal scrolling. */}
+                          <ScrollArea className="h-72 min-h-0">
                             <div className="space-y-3 pr-3">
                               {previewData.arabic.ayahs.map((ayah, i) => (
                                 <div
@@ -1201,7 +1355,7 @@ export default function HomePage() {
                             </div>
                           </ScrollArea>
 
-                          {/* Audio controls - pinned to bottom */}
+                          {/* Audio controls — always visible at bottom */}
                           {previewData.arabic.ayahs[currentAyahIndex]?.audio && (
                             <div className="flex items-center justify-center gap-3 pt-4 mt-auto">
                               <Button
@@ -1522,6 +1676,19 @@ export default function HomePage() {
                           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                             <Volume2 className="h-3 w-3 shrink-0" />
                             <span className="truncate">{video.reciterName}</span>
+                            {video.reciterSource && (
+                              <span
+                                className={
+                                  'text-[9px] px-1 py-0.5 rounded shrink-0 ' +
+                                  (video.reciterSource === 'quranpedia'
+                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'
+                                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200')
+                                }
+                                title={`Reciter source: ${video.reciterSource}`}
+                              >
+                                {video.reciterSource === 'quranpedia' ? 'QP' : 'AQ'}
+                              </span>
+                            )}
                           </div>
                         )}
                         {video.translationName && (
