@@ -106,38 +106,42 @@ ffmpeg -version
 quran-video-generate/
 ├── app/
 │   ├── api/
-│   │   ├── generate/route.ts      # Video generation endpoint
+│   │   ├── docs/route.ts            # Interactive API docs
+│   │   ├── generate/route.ts        # Video generation endpoint
 │   │   ├── quran/
-│   │   │   ├── surahs/route.ts    # Surah list endpoint
-│   │   │   └── ayahs/route.ts     # Ayah data endpoint
+│   │   │   ├── surahs/route.ts      # Surah list endpoint
+│   │   │   ├── ayahs/route.ts       # Ayah data endpoint
+│   │   │   └── reciters/route.ts    # Merged reciters (alquran.cloud + QuranPedia)
 │   │   └── videos/
-│   │       ├── route.ts           # Video list endpoint
-│   │       └── [id]/route.ts      # Video stream & delete
-│   ├── layout.tsx                 # Root layout
-│   ├── page.tsx                   # Main page
-│   └── globals.css                # Global styles
-├── components/ui/                 # UI primitives (no Radix)
-│   ├── button.tsx, badge.tsx      # Button & badge with variants
-│   ├── card.tsx                   # Card layout
-│   ├── dialog.tsx                 # Modal dialog (portal-based)
-│   ├── alert-dialog.tsx           # Confirmation dialog
-│   ├── select.tsx                 # Custom dropdown
-│   ├── tabs.tsx                   # Tab navigation
-│   ├── input.tsx, label.tsx       # Form controls
-│   ├── progress.tsx              # Progress bar
-│   ├── scroll-area.tsx           # Scrollable container
-│   ├── separator.tsx             # Visual divider
-│   └── slot.tsx                  # Slot pattern
+│   │       ├── route.ts             # Video list endpoint
+│   │       └── [id]/route.ts        # Video stream & delete
+│   ├── layout.tsx                   # Root layout
+│   ├── page.tsx                     # Main page
+│   └── globals.css                  # Global styles
+├── components/ui/                   # UI primitives (no Radix)
+│   ├── button.tsx, badge.tsx        # Button & badge with variants
+│   ├── card.tsx                     # Card layout
+│   ├── dialog.tsx                   # Modal dialog (portal-based)
+│   ├── alert-dialog.tsx             # Confirmation dialog
+│   ├── select.tsx                   # Custom dropdown
+│   ├── tabs.tsx                     # Tab navigation
+│   ├── github-icon.tsx              # GitHub SVG icon
+│   ├── input.tsx, label.tsx         # Form controls
+│   ├── progress.tsx                 # Progress bar
+│   ├── scroll-area.tsx              # Scrollable container
+│   ├── separator.tsx                # Visual divider
+│   └── slot.tsx                     # Slot pattern
 ├── lib/
-│   ├── generation.ts             # Video generation pipeline
-│   ├── ffmpeg.ts                 # FFmpeg operations (ASS subtitles, rendering)
-│   ├── quran-api.ts              # alquran.cloud API client with caching
-│   ├── i18n.ts                   # 26-language translation map
-│   ├── storage.ts                # File system storage
-│   └── utils.ts                  # cn() utility
+│   ├── generation.ts                # Video generation pipeline
+│   ├── ffmpeg.ts                    # FFmpeg operations (ASS subtitles, rendering)
+│   ├── quran-api.ts                 # alquran.cloud API client with caching
+│   ├── quranpedia.ts                # QuranPedia reciters service
+│   ├── i18n.ts                      # 26-language translation map
+│   ├── storage.ts                   # File system storage
+│   └── utils.ts                     # cn() utility
 ├── types/
-│   └── quran.ts                  # TypeScript interfaces
-└── storage/                       # Generated videos & metadata (gitignored)
+│   └── quran.ts                     # TypeScript interfaces
+└── storage/                          # Generated videos & metadata (gitignored)
 ```
 
 ---
