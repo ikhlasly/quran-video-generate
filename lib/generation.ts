@@ -352,6 +352,29 @@ async function runPipeline(
     config.translation
   );
 
+  // Override audio URLs for QuranPedia reciters
+  if (config.reciterSource === 'quranpedia' && config.reciterMoshafServer) {
+    try {
+      const base = config.reciterMoshafServer.endsWith('/')
+        ? config.reciterMoshafServer
+        : `${config.reciterMoshafServer}/`;
+      const moshafType = config.reciterMoshafType ?? 'unknown';
+      const surahStr = String(config.surah).padStart(3, '0');
+      arabic.ayahs = arabic.ayahs.map((a, idx) => {
+        const ayahNum = a.numberInSurah;
+        if (moshafType === 'versebyverse') {
+          return { ...a, audio: `${base}${surahStr}${String(ayahNum).padStart(3, '0')}.mp3` };
+        }
+        if (moshafType === 'gapless' && idx === 0) {
+          return { ...a, audio: `${base}${surahStr}.mp3` };
+        }
+        return { ...a, audio: undefined };
+      });
+    } catch (err) {
+      console.error('[generation] QuranPedia audio URL override failed:', err);
+    }
+  }
+
   // Get surah name
   let surahName = config.surahName || '';
   if (!surahName) {
