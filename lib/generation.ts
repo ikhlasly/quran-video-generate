@@ -313,10 +313,16 @@ export async function startGeneration(config: GenerationConfig): Promise<string>
     if (j) {
       j.status = 'failed';
       const rawMsg = err instanceof Error ? err.message : String(err);
-      if (rawMsg.toLowerCase().includes('ffmpeg') || rawMsg.toLowerCase().includes('cannot find')) {
+      const lowerMsg = rawMsg.toLowerCase();
+      if (
+        lowerMsg.includes('cannot find ffmpeg') ||
+        lowerMsg.includes('spawn ffmpeg enoent') ||
+        lowerMsg.includes('ffmpeg was not found')
+      ) {
         j.error = 'FFmpeg is not installed or not in PATH. Install FFmpeg to generate videos: https://ffmpeg.org/download.html';
       } else {
         j.error = rawMsg;
+        console.error(`[generation] Job ${jobId} failed:`, err);
       }
       j.message = j.error;
       updateJob(j);

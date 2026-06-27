@@ -103,7 +103,7 @@ function buildConcatFilterGraph(
     fc += `[${i}:v]`;
   }
   fc += `concat=n=${clipCount}:v=1:a=0[v0]`;
-  fc += `;[v0]scale=${preset.width}:${preset.height}:force_original_aspect_ratio=decrease,pad=${preset.width}:${preset.height}:(ow-iw)/2:(oh-ih)/2:black,fps=${OUTPUT_FPS},setsar=1[v1]`;
+  fc += `;[v0]scale=${preset.width}:${preset.height}:force_original_aspect_ratio=decrease,pad=${preset.width}:${preset.height}:(ow-iw)/2:(oh-ih)/2:black,fps=${OUTPUT_FPS},setsar=sar=1[v1]`;
 
   let current = "v1";
   let subIdx = 2;
