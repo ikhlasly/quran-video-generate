@@ -81,71 +81,61 @@ function escapeSubtitlePath(p: string): string {
   return p.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/:/g, "\\:");
 }
 
-/**
- * Build a filter_complex graph that concatenates all video clip inputs,
- * scales/pads to the target resolution, and applies subtitle overlays.
- *
- * The concat filter decodes each clip to raw frames, concatenates them,
- * then re-encodes — so clips with different codec parameters render
- * correctly without freezing.
- */
-function buildConcatFilterGraph(
-  clipCount: number,
-  preset: { width: number; height: number },
+function buildSubtitleFilters(
   arabicSub: string,
   translationSub: string,
   showArabic: boolean,
   showTranslation: boolean,
   logoSub?: string,
-): string {
-  let fc = "";
-  for (let i = 0; i < clipCount; i++) {
-    fc += `[${i}:v]`;
-  }
-  fc += `concat=n=${clipCount}:v=1:a=0[v0]`;
-  fc += `;[v0]scale=${preset.width}:${preset.height}:force_original_aspect_ratio=decrease,pad=${preset.width}:${preset.height}:(ow-iw)/2:(oh-ih)/2:black,fps=${OUTPUT_FPS},setsar=sar=1[v1]`;
-
-  let current = "v1";
-  let subIdx = 2;
+): string[] {
+  const filters: string[] = [];
   if (showArabic && fs.existsSync(arabicSub)) {
-    fc += `;[${current}]subtitles='${escapeSubtitlePath(arabicSub)}'[v${subIdx}]`;
-    current = `v${subIdx}`;
-    subIdx++;
+    filters.push(`subtitles='${escapeSubtitlePath(arabicSub)}'`);
   }
-  if (showTranslation && translationSub !== arabicSub && fs.existsSync(translationSub)) {
-    fc += `;[${current}]subtitles='${escapeSubtitlePath(translationSub)}'[v${subIdx}]`;
-    current = `v${subIdx}`;
-    subIdx++;
+  if (
+    showTranslation &&
+    translationSub !== arabicSub &&
+    fs.existsSync(translationSub)
+  ) {
+    filters.push(`subtitles='${escapeSubtitlePath(translationSub)}'`);
   }
   if (logoSub && fs.existsSync(logoSub)) {
-    fc += `;[${current}]subtitles='${escapeSubtitlePath(logoSub)}'[v${subIdx}]`;
-    current = `v${subIdx}`;
-    subIdx++;
+    filters.push(`subtitles='${escapeSubtitlePath(logoSub)}'`);
   }
-  fc += `;[${current}]null[outv]`;
-
-  return fc;
+  return filters;
 }
 
-async function prepareClipInputs(
+async function writeConcatList(
   clipPaths: string[],
+  concatListPath: string,
   targetDuration: number,
-): Promise<{ clips: string[]; count: number }> {
-  let finalClips = clipPaths;
+): Promise<void> {
+  let loopMultiplier = 1;
   if (targetDuration > 0 && clipPaths.length > 0) {
-    const total = await probeClipDurations(clipPaths);
-    if (total > 0 && targetDuration > total) {
-      const loopMultiplier = Math.ceil(targetDuration / total) + 1;
-      finalClips = [];
-      for (let loop = 0; loop < loopMultiplier; loop++) {
-        finalClips.push(...clipPaths);
-      }
+    const totalClipDuration = await probeClipDurations(clipPaths);
+    if (totalClipDuration > 0 && targetDuration > totalClipDuration) {
+      loopMultiplier = Math.ceil(targetDuration / totalClipDuration) + 1;
     }
   }
-  if (finalClips.length === 0) {
-    throw new Error("No valid video clips available");
+  const lines: string[] = [];
+  for (let loop = 0; loop < loopMultiplier; loop++) {
+    for (const clip of clipPaths) {
+      lines.push(`file '${clip.replace(/'/g, "'\\''")}'`);
+    }
   }
-  return { clips: finalClips, count: finalClips.length };
+  fs.writeFileSync(concatListPath, lines.join("\n"));
+}
+
+function buildVfChain(
+  preset: { width: number; height: number },
+  subtitleFilters: string[],
+): string {
+  const scaleFilter = [
+    `scale=${preset.width}:${preset.height}:force_original_aspect_ratio=decrease`,
+    `pad=${preset.width}:${preset.height}:(ow-iw)/2:(oh-ih)/2:black`,
+    `fps=${OUTPUT_FPS}`,
+  ].join(",");
+  return [scaleFilter, ...subtitleFilters].join(",");
 }
 
 // ---------------------------------------------------------------------------
@@ -245,26 +235,45 @@ export async function renderVideo(
 ): Promise<void> {
   const preset = ORIENTATION_PRESETS[orientation];
   const targetDuration = audioDuration && audioDuration > 0 ? audioDuration : 0;
-  const { clips, count } = await prepareClipInputs(clipPaths, targetDuration);
 
-  const filterGraph = buildConcatFilterGraph(
-    count, preset, arabicSub, translationSub,
-    showArabic, showTranslation, logoSub,
-  );
+  const concatListPath = path.join(jobDir, "concat.txt");
 
-  const audioInputIdx = count;
+  const [subtitleFilters] = await Promise.all([
+    Promise.resolve(
+      buildSubtitleFilters(
+        arabicSub,
+        translationSub,
+        showArabic,
+        showTranslation,
+        logoSub,
+      ),
+    ),
+    writeConcatList(clipPaths, concatListPath, targetDuration),
+  ]);
+
+  const vfChain = buildVfChain(preset, subtitleFilters);
 
   const outputOpts: string[] = [
-    "-filter_complex", filterGraph,
-    "-map", "[outv]",
-    "-map", `${audioInputIdx}:a:0`,
-    "-c:v", "libx264",
-    "-preset", "veryfast",
-    "-crf", "23",
-    "-c:a", "aac",
-    "-b:a", "192k",
-    "-pix_fmt", "yuv420p",
-    "-vsync", "cfr",
+    "-vf",
+    vfChain,
+    "-c:v",
+    "libx264",
+    "-preset",
+    "veryfast",
+    "-crf",
+    "23",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "192k",
+    "-map",
+    "0:v:0",
+    "-map",
+    "1:a:0",
+    "-pix_fmt",
+    "yuv420p",
+    "-vsync",
+    "cfr",
   ];
 
   if (targetDuration > 0) {
@@ -274,17 +283,22 @@ export async function renderVideo(
   }
 
   return new Promise((resolve, reject) => {
-    const command = ffmpeg();
-    for (const clip of clips) {
-      command.input(clip);
-    }
-    command.input(audio);
+    const cleanup = () => {
+      try { fs.unlinkSync(concatListPath); } catch { /* ignore */ }
+    };
 
-    command
+    ffmpeg()
+      .input(concatListPath)
+      .inputOptions([
+        "-f", "concat",
+        "-safe", "0",
+        "-fflags", "+genpts+igndts",
+      ])
+      .input(audio)
       .outputOptions(outputOpts)
       .output(output)
-      .on("end", () => resolve())
-      .on("error", (err) => reject(err))
+      .on("end", () => { cleanup(); resolve(); })
+      .on("error", (err) => { cleanup(); reject(err); })
       .run();
   });
 }
@@ -303,22 +317,38 @@ export async function renderVideoWithoutAudio(
 ): Promise<void> {
   const preset = ORIENTATION_PRESETS[orientation];
   const duration = targetDuration && targetDuration > 0 ? targetDuration : 0;
-  const { clips, count } = await prepareClipInputs(clipPaths, duration);
 
-  const filterGraph = buildConcatFilterGraph(
-    count, preset, arabicSub, translationSub,
-    showArabic, showTranslation, logoSub,
-  );
+  const concatListPath = path.join(jobDir, "concat_noaudio.txt");
+
+  const [subtitleFilters] = await Promise.all([
+    Promise.resolve(
+      buildSubtitleFilters(
+        arabicSub,
+        translationSub,
+        showArabic,
+        showTranslation,
+        logoSub,
+      ),
+    ),
+    writeConcatList(clipPaths, concatListPath, duration),
+  ]);
+
+  const vfChain = buildVfChain(preset, subtitleFilters);
 
   const outputOpts: string[] = [
-    "-filter_complex", filterGraph,
-    "-map", "[outv]",
-    "-c:v", "libx264",
-    "-preset", "veryfast",
-    "-crf", "23",
+    "-vf",
+    vfChain,
+    "-c:v",
+    "libx264",
+    "-preset",
+    "veryfast",
+    "-crf",
+    "23",
     "-an",
-    "-pix_fmt", "yuv420p",
-    "-vsync", "cfr",
+    "-pix_fmt",
+    "yuv420p",
+    "-vsync",
+    "cfr",
   ];
 
   if (duration > 0) {
@@ -326,16 +356,21 @@ export async function renderVideoWithoutAudio(
   }
 
   return new Promise((resolve, reject) => {
-    const command = ffmpeg();
-    for (const clip of clips) {
-      command.input(clip);
-    }
+    const cleanup = () => {
+      try { fs.unlinkSync(concatListPath); } catch { /* ignore */ }
+    };
 
-    command
+    ffmpeg()
+      .input(concatListPath)
+      .inputOptions([
+        "-f", "concat",
+        "-safe", "0",
+        "-fflags", "+genpts+igndts",
+      ])
       .outputOptions(outputOpts)
       .output(output)
-      .on("end", () => resolve())
-      .on("error", (err) => reject(err))
+      .on("end", () => { cleanup(); resolve(); })
+      .on("error", (err) => { cleanup(); reject(err); })
       .run();
   });
 }
