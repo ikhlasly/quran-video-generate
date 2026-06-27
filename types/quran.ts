@@ -220,6 +220,7 @@ export const AI_PROVIDER_MODELS: Record<
   openrouter: {
     label: "OpenRouter (Free)",
     models: [
+      "openrouter/free",
       "openai/gpt-oss-120b:free",
       "openai/gpt-oss-20b:free",
       "meta-llama/llama-3.3-70b-instruct:free",
