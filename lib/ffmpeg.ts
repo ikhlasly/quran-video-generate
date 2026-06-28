@@ -14,50 +14,46 @@ export const ORIENTATION_PRESETS = {
 
 export type Orientation = keyof typeof ORIENTATION_PRESETS;
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-/** Output frame-rate used everywhere — single source of truth. */
 const OUTPUT_FPS = 30;
+const CLIP_DURATION_FALLBACK_S = 5; // Safer fallback
 
-/** Fallback per-clip duration when ffprobe fails (seconds). */
-const CLIP_DURATION_FALLBACK_S = 15;
+const VIDEO_ENCODER = process.env.VIDEO_ENCODER || "libx264";
+const VIDEO_PRESET = process.env.VIDEO_PRESET || "veryfast";
+const VIDEO_CRF = process.env.VIDEO_CRF || "23";
 
 // ---------------------------------------------------------------------------
 // ffprobe helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Probe a single file for its duration.
- * Uses the format-level duration first, falling back to the first stream.
- */
 function ffprobeDuration(filePath: string): Promise<number> {
   return new Promise((resolve, reject) => {
-    ffmpeg.ffprobe(filePath, (err, metadata) => {
-      if (err) return reject(err);
-      const dur = metadata.format?.duration ?? metadata.streams?.[0]?.duration;
-      if (dur !== undefined) {
-        resolve(parseFloat(String(dur)));
-      } else {
-        reject(new Error(`Could not determine duration of ${filePath}`));
-      }
-    });
+    child_process.execFile(
+      "ffprobe",
+      [
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        filePath,
+      ],
+      { timeout: 5000 },
+      (err, stdout, stderr) => {
+        if (err) return reject(err);
+        const dur = parseFloat(stdout.trim());
+        if (!isNaN(dur) && dur > 0) resolve(dur);
+        else reject(new Error(`Could not determine duration of ${filePath}`));
+      },
+    );
   });
 }
 
 export const getAudioDuration = (filePath: string): Promise<number> =>
   ffprobeDuration(filePath);
-
 export const getVideoDuration = (filePath: string): Promise<number> =>
   ffprobeDuration(filePath);
 
-/**
- * Probe all clip paths concurrently.
- * Falls back to CLIP_DURATION_FALLBACK_S for any file that fails.
- *
- * ⚡ Key optimisation: parallel ffprobe calls instead of sequential awaits.
- */
 async function probeClipDurations(clipPaths: string[]): Promise<number> {
   const results = await Promise.allSettled(
     clipPaths.map((p) => ffprobeDuration(p)),
@@ -73,69 +69,53 @@ async function probeClipDurations(clipPaths: string[]): Promise<number> {
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Escape a file path for use inside an ASS/SRT subtitles= filter value.
- * Must escape single-quotes and colons for the FFmpeg filter-graph parser.
- */
 function escapeSubtitlePath(p: string): string {
   return p.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/:/g, "\\:");
 }
 
-function buildSubtitleFilters(
+async function buildSubtitleFilters(
   arabicSub: string,
   translationSub: string,
   showArabic: boolean,
   showTranslation: boolean,
   logoSub?: string,
-): string[] {
+): Promise<string[]> {
   const filters: string[] = [];
-  if (showArabic && fs.existsSync(arabicSub)) {
-    filters.push(`subtitles='${escapeSubtitlePath(arabicSub)}'`);
+  const checks: Promise<void>[] = [];
+
+  if (showArabic) {
+    checks.push(
+      fs.promises
+        .access(arabicSub)
+        .then(() => {
+          filters.push(`subtitles='${escapeSubtitlePath(arabicSub)}'`);
+        })
+        .catch(() => {}),
+    );
   }
-  if (
-    showTranslation &&
-    translationSub !== arabicSub &&
-    fs.existsSync(translationSub)
-  ) {
-    filters.push(`subtitles='${escapeSubtitlePath(translationSub)}'`);
+  if (showTranslation && translationSub !== arabicSub) {
+    checks.push(
+      fs.promises
+        .access(translationSub)
+        .then(() => {
+          filters.push(`subtitles='${escapeSubtitlePath(translationSub)}'`);
+        })
+        .catch(() => {}),
+    );
   }
-  if (logoSub && fs.existsSync(logoSub)) {
-    filters.push(`subtitles='${escapeSubtitlePath(logoSub)}'`);
+  if (logoSub) {
+    checks.push(
+      fs.promises
+        .access(logoSub)
+        .then(() => {
+          filters.push(`subtitles='${escapeSubtitlePath(logoSub)}'`);
+        })
+        .catch(() => {}),
+    );
   }
+
+  await Promise.all(checks);
   return filters;
-}
-
-async function writeConcatList(
-  clipPaths: string[],
-  concatListPath: string,
-  targetDuration: number,
-): Promise<void> {
-  let loopMultiplier = 1;
-  if (targetDuration > 0 && clipPaths.length > 0) {
-    const totalClipDuration = await probeClipDurations(clipPaths);
-    if (totalClipDuration > 0 && targetDuration > totalClipDuration) {
-      loopMultiplier = Math.ceil(targetDuration / totalClipDuration) + 1;
-    }
-  }
-  const lines: string[] = [];
-  for (let loop = 0; loop < loopMultiplier; loop++) {
-    for (const clip of clipPaths) {
-      lines.push(`file '${clip.replace(/'/g, "'\\''")}'`);
-    }
-  }
-  fs.writeFileSync(concatListPath, lines.join("\n"));
-}
-
-function buildVfChain(
-  preset: { width: number; height: number },
-  subtitleFilters: string[],
-): string {
-  const scaleFilter = [
-    `scale=${preset.width}:${preset.height}:force_original_aspect_ratio=decrease`,
-    `pad=${preset.width}:${preset.height}:(ow-iw)/2:(oh-ih)/2:black`,
-    `fps=${OUTPUT_FPS}`,
-  ].join(",");
-  return [scaleFilter, ...subtitleFilters].join(",");
 }
 
 // ---------------------------------------------------------------------------
@@ -152,19 +132,18 @@ export function scaleVideo(
     ffmpeg(input)
       .outputOptions([
         "-vf",
-        [
-          `scale=${preset.width}:${preset.height}:force_original_aspect_ratio=decrease`,
-          `pad=${preset.width}:${preset.height}:(ow-iw)/2:(oh-ih)/2:black`,
-        ].join(","),
+        `scale=${preset.width}:${preset.height}:force_original_aspect_ratio=decrease,pad=${preset.width}:${preset.height}:(ow-iw)/2:(oh-ih)/2:black`,
         "-c:v",
-        "libx264",
+        VIDEO_ENCODER,
         "-preset",
-        "fast",
+        VIDEO_PRESET,
         "-crf",
-        "23",
+        VIDEO_CRF,
         "-r",
         String(OUTPUT_FPS),
         "-an",
+        "-movflags",
+        "+faststart",
       ])
       .output(output)
       .on("end", () => resolve())
@@ -173,20 +152,12 @@ export function scaleVideo(
   });
 }
 
-/**
- * Generate a solid-colour background video using lavfi.
- *
- * ⚡ Changed from execFileSync (blocks the Node event loop) to execFile
- *    (async, callback-based) so the server can handle other requests while
- *    FFmpeg runs.
- */
 export function generateBackgroundVideo(
   output: string,
   orientation: Orientation,
   duration: number = 60,
 ): Promise<void> {
   const { width: w, height: h } = ORIENTATION_PRESETS[orientation];
-
   return new Promise((resolve, reject) => {
     child_process.execFile(
       "ffmpeg",
@@ -196,7 +167,7 @@ export function generateBackgroundVideo(
         "-i",
         `color=c=0x0d1b2a:s=${w}x${h}:d=${duration}:r=${OUTPUT_FPS}`,
         "-c:v",
-        "libx264",
+        VIDEO_ENCODER,
         "-preset",
         "ultrafast",
         "-crf",
@@ -208,14 +179,16 @@ export function generateBackgroundVideo(
         "yuv420p",
         "-t",
         String(duration),
+        "-movflags",
+        "+faststart",
         "-y",
         output,
       ],
       { timeout: 120_000 },
-      (err) => {
-        if (err) reject(err instanceof Error ? err : new Error(String(err)));
-        else resolve();
-      },
+      (err) =>
+        err
+          ? reject(err instanceof Error ? err : new Error(String(err)))
+          : resolve(),
     );
   });
 }
@@ -226,7 +199,7 @@ export async function renderVideo(
   arabicSub: string,
   translationSub: string,
   output: string,
-  jobDir: string,
+  jobDir: string, // Kept for signature compatibility
   orientation: Orientation,
   audioDuration?: number,
   showArabic: boolean = true,
@@ -236,69 +209,93 @@ export async function renderVideo(
   const preset = ORIENTATION_PRESETS[orientation];
   const targetDuration = audioDuration && audioDuration > 0 ? audioDuration : 0;
 
-  const concatListPath = path.join(jobDir, "concat.txt");
+  // Calculate safe loop multiplier
+  let loopMultiplier = 1;
+  if (targetDuration > 0 && clipPaths.length > 0) {
+    const totalClipDuration = await probeClipDurations(clipPaths);
+    loopMultiplier =
+      totalClipDuration > 0
+        ? Math.ceil(targetDuration / totalClipDuration) + 2
+        : Math.max(
+            10,
+            Math.ceil(
+              targetDuration / (clipPaths.length * CLIP_DURATION_FALLBACK_S),
+            ) + 2,
+          );
+  }
 
-  const [subtitleFilters] = await Promise.all([
-    Promise.resolve(
-      buildSubtitleFilters(
-        arabicSub,
-        translationSub,
-        showArabic,
-        showTranslation,
-        logoSub,
-      ),
-    ),
-    writeConcatList(clipPaths, concatListPath, targetDuration),
-  ]);
+  const subtitleFilters = await buildSubtitleFilters(
+    arabicSub,
+    translationSub,
+    showArabic,
+    showTranslation,
+    logoSub,
+  );
+  const scaleFilter = `scale=${preset.width}:${preset.height}:force_original_aspect_ratio=decrease,pad=${preset.width}:${preset.height}:(ow-iw)/2:(oh-ih)/2:black,fps=${OUTPUT_FPS},setsar=1`;
 
-  const vfChain = buildVfChain(preset, subtitleFilters);
+  // Build filter_complex dynamically to safely concat videos of varying resolutions
+  const inputs: string[] = [];
+  const filterParts: string[] = [];
+  let inputIdx = 0;
+  const videoLabels: string[] = [];
+
+  for (let loop = 0; loop < loopMultiplier; loop++) {
+    for (const clip of clipPaths) {
+      inputs.push(clip);
+      const label = `v${inputIdx}`;
+      filterParts.push(`[${inputIdx}:v]${scaleFilter}[${label}]`);
+      videoLabels.push(`[${label}]`);
+      inputIdx++;
+    }
+  }
+
+  const concatLabel = "[vconcat]";
+  filterParts.push(
+    `${videoLabels.join("")}concat=n=${videoLabels.length}:v=1:a=0${concatLabel}`,
+  );
+
+  if (subtitleFilters.length > 0) {
+    filterParts.push(`${concatLabel}${subtitleFilters.join(",")}[vout]`);
+  } else {
+    filterParts.push(`${concatLabel}null[vout]`);
+  }
 
   const outputOpts: string[] = [
-    "-vf",
-    vfChain,
+    "-filter_complex",
+    filterParts.join(";"),
+    "-map",
+    "[vout]",
+    "-map",
+    `${inputIdx}:a:0`, // Audio is the last input
     "-c:v",
-    "libx264",
+    VIDEO_ENCODER,
     "-preset",
-    "veryfast",
+    VIDEO_PRESET,
     "-crf",
-    "23",
+    VIDEO_CRF,
     "-c:a",
     "aac",
     "-b:a",
     "192k",
-    "-map",
-    "0:v:0",
-    "-map",
-    "1:a:0",
     "-pix_fmt",
     "yuv420p",
-    "-vsync",
+    "-fps_mode",
     "cfr",
+    "-movflags",
+    "+faststart",
+    "-shortest", // Cuts video exactly when audio ends, preventing frozen frames
   ];
 
-  if (targetDuration > 0) {
-    outputOpts.push("-t", String(Math.ceil(targetDuration)));
-  } else {
-    outputOpts.push("-shortest");
-  }
-
   return new Promise((resolve, reject) => {
-    const cleanup = () => {
-      try { fs.unlinkSync(concatListPath); } catch { /* ignore */ }
-    };
+    const command = ffmpeg();
+    inputs.forEach((inp) => command.input(inp));
+    command.input(audio);
 
-    ffmpeg()
-      .input(concatListPath)
-      .inputOptions([
-        "-f", "concat",
-        "-safe", "0",
-        "-fflags", "+genpts+igndts",
-      ])
-      .input(audio)
+    command
       .outputOptions(outputOpts)
       .output(output)
-      .on("end", () => { cleanup(); resolve(); })
-      .on("error", (err) => { cleanup(); reject(err); })
+      .on("end", () => resolve())
+      .on("error", reject)
       .run();
   });
 }
@@ -318,59 +315,86 @@ export async function renderVideoWithoutAudio(
   const preset = ORIENTATION_PRESETS[orientation];
   const duration = targetDuration && targetDuration > 0 ? targetDuration : 0;
 
-  const concatListPath = path.join(jobDir, "concat_noaudio.txt");
+  let loopMultiplier = 1;
+  if (duration > 0 && clipPaths.length > 0) {
+    const totalClipDuration = await probeClipDurations(clipPaths);
+    loopMultiplier =
+      totalClipDuration > 0
+        ? Math.ceil(duration / totalClipDuration) + 2
+        : Math.max(
+            10,
+            Math.ceil(
+              duration / (clipPaths.length * CLIP_DURATION_FALLBACK_S),
+            ) + 2,
+          );
+  }
 
-  const [subtitleFilters] = await Promise.all([
-    Promise.resolve(
-      buildSubtitleFilters(
-        arabicSub,
-        translationSub,
-        showArabic,
-        showTranslation,
-        logoSub,
-      ),
-    ),
-    writeConcatList(clipPaths, concatListPath, duration),
-  ]);
+  const subtitleFilters = await buildSubtitleFilters(
+    arabicSub,
+    translationSub,
+    showArabic,
+    showTranslation,
+    logoSub,
+  );
+  const scaleFilter = `scale=${preset.width}:${preset.height}:force_original_aspect_ratio=decrease,pad=${preset.width}:${preset.height}:(ow-iw)/2:(oh-ih)/2:black,fps=${OUTPUT_FPS},setsar=1`;
 
-  const vfChain = buildVfChain(preset, subtitleFilters);
+  const inputs: string[] = [];
+  const filterParts: string[] = [];
+  let inputIdx = 0;
+  const videoLabels: string[] = [];
+
+  for (let loop = 0; loop < loopMultiplier; loop++) {
+    for (const clip of clipPaths) {
+      inputs.push(clip);
+      const label = `v${inputIdx}`;
+      filterParts.push(`[${inputIdx}:v]${scaleFilter}[${label}]`);
+      videoLabels.push(`[${label}]`);
+      inputIdx++;
+    }
+  }
+
+  const concatLabel = "[vconcat]";
+  filterParts.push(
+    `${videoLabels.join("")}concat=n=${videoLabels.length}:v=1:a=0${concatLabel}`,
+  );
+
+  if (subtitleFilters.length > 0) {
+    filterParts.push(`${concatLabel}${subtitleFilters.join(",")}[vout]`);
+  } else {
+    filterParts.push(`${concatLabel}null[vout]`);
+  }
 
   const outputOpts: string[] = [
-    "-vf",
-    vfChain,
+    "-filter_complex",
+    filterParts.join(";"),
+    "-map",
+    "[vout]",
     "-c:v",
-    "libx264",
+    VIDEO_ENCODER,
     "-preset",
-    "veryfast",
+    VIDEO_PRESET,
     "-crf",
-    "23",
+    VIDEO_CRF,
     "-an",
     "-pix_fmt",
     "yuv420p",
-    "-vsync",
+    "-fps_mode",
     "cfr",
+    "-movflags",
+    "+faststart",
   ];
 
-  if (duration > 0) {
-    outputOpts.push("-t", String(Math.ceil(duration)));
-  }
+  if (duration > 0) outputOpts.push("-t", String(Math.ceil(duration)));
 
   return new Promise((resolve, reject) => {
-    const cleanup = () => {
-      try { fs.unlinkSync(concatListPath); } catch { /* ignore */ }
-    };
+    const command = ffmpeg();
+    inputs.forEach((inp) => command.input(inp));
 
-    ffmpeg()
-      .input(concatListPath)
-      .inputOptions([
-        "-f", "concat",
-        "-safe", "0",
-        "-fflags", "+genpts+igndts",
-      ])
+    command
       .outputOptions(outputOpts)
       .output(output)
-      .on("end", () => { cleanup(); resolve(); })
-      .on("error", (err) => { cleanup(); reject(err); })
+      .on("end", () => resolve())
+      .on("error", reject)
       .run();
   });
 }
@@ -381,54 +405,68 @@ export async function renderVideoWithoutAudio(
 
 export function downloadFile(url: string, output: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    fs.mkdirSync(path.dirname(output), { recursive: true });
+    fs.promises
+      .mkdir(path.dirname(output), { recursive: true })
+      .then(() => {
+        const file = fs.createWriteStream(output);
+        const doRequest = (requestUrl: string, redirectCount = 0) => {
+          if (redirectCount > 10)
+            return reject(new Error("Too many redirects"));
 
-    const file = fs.createWriteStream(output);
+          const protocol = requestUrl.startsWith("https") ? https : http;
+          const req = protocol.get(
+            requestUrl,
+            { timeout: 30000 },
+            (response) => {
+              if (
+                response.statusCode &&
+                response.statusCode >= 300 &&
+                response.statusCode < 400 &&
+                response.headers.location
+              ) {
+                response.resume();
+                doRequest(response.headers.location, redirectCount + 1);
+                return;
+              }
+              if (response.statusCode !== 200) {
+                reject(
+                  new Error(
+                    `Download failed with status ${response.statusCode}`,
+                  ),
+                );
+                file.close();
+                fs.promises.unlink(output).catch(() => {});
+                return;
+              }
+              response.pipe(file);
+              file.on("finish", () => {
+                file.close();
+                resolve();
+              });
+            },
+          );
 
-    const doRequest = (requestUrl: string, redirectCount = 0) => {
-      if (redirectCount > 10) {
-        reject(new Error("Too many redirects"));
-        return;
-      }
-
-      const protocol = requestUrl.startsWith("https") ? https : http;
-
-      protocol
-        .get(requestUrl, (response) => {
-          if (
-            response.statusCode &&
-            response.statusCode >= 300 &&
-            response.statusCode < 400 &&
-            response.headers.location
-          ) {
-            doRequest(response.headers.location, redirectCount + 1);
-            return;
-          }
-
-          if (response.statusCode !== 200) {
-            reject(
-              new Error(`Download failed with status ${response.statusCode}`),
-            );
-            return;
-          }
-
-          response.pipe(file);
-          file.on("finish", () => {
+          req.on("error", (err) => {
             file.close();
-            resolve();
+            fs.promises.unlink(output).catch(() => {});
+            reject(err);
           });
-        })
-        .on("error", (err) => {
-          fs.unlink(output, () => reject(err));
-        });
-    };
 
-    doRequest(url);
+          req.on("timeout", () =>
+            req.destroy(
+              new Error(`Request timed out downloading ${requestUrl}`),
+            ),
+          );
+        };
+
+        doRequest(url);
+      })
+      .catch(reject);
   });
 }
 
 // ---------------------------------------------------------------------------
-// Text utilities
+// Text & Subtitles
 // ---------------------------------------------------------------------------
 
 export function wrapArabicText(
@@ -467,16 +505,11 @@ export function wrapTranslationText(
   return lines;
 }
 
-// ---------------------------------------------------------------------------
-// ASS subtitle generation
-// ---------------------------------------------------------------------------
-
 interface ASSEntry {
   start: number;
   end: number;
   text: string;
 }
-
 interface ASSOptions {
   orientation: Orientation;
   fontName?: string;
@@ -486,7 +519,7 @@ interface ASSOptions {
 function getSubtitlePositionConfig(
   position: SubtitlePosition = "bottom",
   orientation: Orientation,
-): { alignment: number; marginV: number } {
+) {
   const isPortrait = orientation === "portrait";
   switch (position) {
     case "top":
@@ -502,11 +535,10 @@ function getSubtitlePositionConfig(
 function getLogoPositionConfig(
   position: LogoPosition,
   orientation: Orientation,
-): { alignment: number; marginV: number; marginL: number; marginR: number } {
+) {
   const isPortrait = orientation === "portrait";
   const marginH = isPortrait ? 12 : 30;
   const marginVv = isPortrait ? 12 : 30;
-
   switch (position) {
     case "top-left":
       return { alignment: 7, marginV: marginVv, marginL: marginH, marginR: 0 };
@@ -524,23 +556,8 @@ function getLogoPositionConfig(
   }
 }
 
-// Shared ASS script-info + styles header generator.
 function buildASSHeader(title: string, styleLine: string): string {
-  return `\ufeff[Script Info]
-Title: ${title}
-ScriptType: v4.00+
-PlayResX: 384
-PlayResY: 288
-WrapStyle: 0
-ScaledBorderAndShadow: yes
-
-[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-${styleLine}
-
-[Events]
-Format: Layer, Start, Time, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-`;
+  return `\ufeff[Script Info]\nTitle: ${title}\nScriptType: v4.00+\nPlayResX: 384\nPlayResY: 288\nWrapStyle: 0\nScaledBorderAndShadow: yes\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n${styleLine}\n\n[Events]\nFormat: Layer, Start, Time, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
 }
 
 export function generateLogoASS(
@@ -561,7 +578,6 @@ export function generateLogoASS(
     .replace(/\{/g, "(")
     .replace(/\}/g, ")")
     .replace(/\n/g, " ");
-
   const styleLine = `Style: Logo,Arial,${fontSize},&HCCFFFFFF,&HCCFFFFFF,&H80000000,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,${alignment},${marginL},${marginR},${marginV},1`;
   const header = buildASSHeader("Logo Overlay", styleLine);
 
@@ -570,24 +586,17 @@ export function generateLogoASS(
   return `${header}Dialogue: 0,${start},${end},Logo,,0,0,0,,{\\q0}${safeText}\n`;
 }
 
-// ---------------------------------------------------------------------------
-// Verse segmentation helpers
-// ---------------------------------------------------------------------------
-
 function splitTextIntoParts(text: string, numParts: number): string[] {
   if (numParts <= 1) return [text];
-
   const words = text.split(/\s+/).filter((w) => w.length > 0);
   if (words.length === 0) return [text];
 
   const wordsPerPart = Math.ceil(words.length / numParts);
   const parts: string[] = [];
-
   for (let i = 0; i < numParts; i++) {
     const slice = words.slice(i * wordsPerPart, (i + 1) * wordsPerPart);
     if (slice.length > 0) parts.push(slice.join(" "));
   }
-
   return parts;
 }
 
@@ -636,10 +645,6 @@ function segmentVerse(
   return segments;
 }
 
-// ---------------------------------------------------------------------------
-// ASS subtitle export functions
-// ---------------------------------------------------------------------------
-
 export function generateASS(entries: ASSEntry[], options: ASSOptions): string {
   const {
     orientation,
@@ -658,20 +663,19 @@ export function generateASS(entries: ASSEntry[], options: ASSOptions): string {
     subtitlePosition,
     orientation,
   );
-
   const styleLine = `Style: Default,${fontName},${fontSize},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,${alignment},${marginL},${marginR},${posMarginV},1`;
   const header = buildASSHeader("Arabic Subtitles", styleLine);
 
   const events: string[] = [];
-
   for (const entry of entries) {
+    // Prevent 0 or negative duration entries which corrupt ASS parsing
+    const safeEnd = Math.max(entry.end, entry.start + 0.1);
     if (entry.text.length > maxChars) {
       const parts = splitTextIntoParts(
         entry.text,
         Math.ceil(entry.text.length / maxChars),
       );
-      const partDuration = (entry.end - entry.start) / parts.length;
-
+      const partDuration = (safeEnd - entry.start) / parts.length;
       for (let i = 0; i < parts.length; i++) {
         const segStart = entry.start + i * partDuration;
         events.push(
@@ -680,11 +684,10 @@ export function generateASS(entries: ASSEntry[], options: ASSOptions): string {
       }
     } else {
       events.push(
-        `Dialogue: 0,${formatASSTime(entry.start)},${formatASSTime(entry.end)},Default,,0,0,0,,{\\q0}\u202B${entry.text}`,
+        `Dialogue: 0,${formatASSTime(entry.start)},${formatASSTime(safeEnd)},Default,,0,0,0,,{\\q0}\u202B${entry.text}`,
       );
     }
   }
-
   return header + events.join("\n") + "\n";
 }
 
@@ -711,7 +714,6 @@ export function generateCombinedASS(
     subtitlePosition,
     orientation,
   );
-
   const styleLine = `Style: Default,${fontName},${baseFontSize},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,2,1,${alignment},${marginL},${marginR},${posMarginV},1`;
   const header = buildASSHeader("Quran Subtitles", styleLine);
 
@@ -723,24 +725,23 @@ export function generateCombinedASS(
     const trEntry = translationEntries[i] ?? { start: 0, end: 0, text: "" };
 
     const entryStart = arEntry.start || trEntry.start;
-    const entryEnd = arEntry.end || trEntry.end;
-    const entryDuration = entryEnd - entryStart;
+    let entryEnd = arEntry.end || trEntry.end;
 
+    // Prevent broken subtitles at the end: ensure duration is strictly positive
+    if (entryEnd <= entryStart) entryEnd = entryStart + 0.5;
+
+    const entryDuration = entryEnd - entryStart;
     const segments = segmentVerse(arEntry.text, trEntry.text, orientation);
     const segmentDuration = entryDuration / segments.length;
 
     for (let seg = 0; seg < segments.length; seg++) {
       const segStart = entryStart + seg * segmentDuration;
       const segEnd = segStart + segmentDuration;
-
       const { arabic, translation } = segments[seg];
-      let combinedText = "";
 
+      let combinedText = "";
       if (arabic && translation) {
-        combinedText =
-          `{\\fn${fontName}}{\\fs${arFontSize}}{\\q0}\u202B${arabic}` +
-          `\\N{\\fs4}\\N` +
-          `{\\fnArial}{\\fs${trFontSize}}{\\q0}${translation}`;
+        combinedText = `{\\fn${fontName}}{\\fs${arFontSize}}{\\q0}\u202B${arabic}\\N{\\fs4}\\N{\\fnArial}{\\fs${trFontSize}}{\\q0}${translation}`;
       } else if (arabic) {
         combinedText = `{\\fn${fontName}}{\\fs${arFontSize}}{\\q0}\u202B${arabic}`;
       } else if (translation) {
@@ -754,7 +755,6 @@ export function generateCombinedASS(
       }
     }
   }
-
   return header + events.join("\n") + "\n";
 }
 
@@ -767,19 +767,13 @@ function formatASSTime(seconds: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// SRT subtitle generation
+// SRT & Audio
 // ---------------------------------------------------------------------------
 
-interface SRTEntry {
-  start: number;
-  end: number;
-  text: string;
-}
-interface SRTOptions {
-  orientation?: Orientation;
-}
-
-export function generateSRT(entries: SRTEntry[], options?: SRTOptions): string {
+export function generateSRT(
+  entries: { start: number; end: number; text: string }[],
+  options?: { orientation?: Orientation },
+): string {
   const orientation = options?.orientation ?? "landscape";
   return (
     entries
@@ -799,49 +793,40 @@ function formatSRTTime(seconds: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")},${String(ms).padStart(3, "0")}`;
 }
 
-// ---------------------------------------------------------------------------
-// Audio concatenation
-// ---------------------------------------------------------------------------
-
-export function concatenateAudio(
+export async function concatenateAudio(
   audioPaths: string[],
   output: string,
 ): Promise<void> {
+  if (audioPaths.length === 0) throw new Error("No audio files to concatenate");
+  if (audioPaths.length === 1) {
+    await fs.promises.copyFile(audioPaths[0], output);
+    return;
+  }
+
+  const concatListPath = `${output}.concat.txt`;
+  await fs.promises.writeFile(
+    concatListPath,
+    audioPaths.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n"),
+    "utf-8",
+  );
+
   return new Promise((resolve, reject) => {
-    if (audioPaths.length === 0) {
-      return reject(new Error("No audio files to concatenate"));
-    }
-
-    if (audioPaths.length === 1) {
-      fs.copyFileSync(audioPaths[0], output);
-      return resolve();
-    }
-
-    const concatListPath = `${output}.concat.txt`;
-    fs.writeFileSync(
-      concatListPath,
-      audioPaths.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n"),
-    );
-
-    const cleanup = () => {
+    const cleanup = async () => {
       try {
-        fs.unlinkSync(concatListPath);
-      } catch {
-        /* ignore */
-      }
+        await fs.promises.unlink(concatListPath);
+      } catch {}
     };
-
     ffmpeg()
       .input(concatListPath)
       .inputOptions(["-f", "concat", "-safe", "0", "-fflags", "+genpts"])
       .outputOptions(["-c:a", "libmp3lame", "-b:a", "192k"])
       .output(output)
-      .on("end", () => {
-        cleanup();
+      .on("end", async () => {
+        await cleanup();
         resolve();
       })
-      .on("error", (err) => {
-        cleanup();
+      .on("error", async (err) => {
+        await cleanup();
         reject(err);
       })
       .run();
